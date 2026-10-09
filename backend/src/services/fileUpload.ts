@@ -50,6 +50,6 @@ export const upload = multer({
 });
 
 export function getFileUrl(filePath: string): string {
-  const baseUrl = `http://localhost:${process.env.PORT || 3001}`;
-  return `${baseUrl}/uploads/${filePath}`;
+  const baseUrl = process.env.PUBLIC_URL || (process.env.PORT ? `http://localhost:${process.env.PORT}` : '');
+  return baseUrl ? `${baseUrl}/uploads/${filePath}` : `/uploads/${filePath}`;
 }
