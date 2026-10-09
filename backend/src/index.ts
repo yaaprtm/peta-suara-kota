@@ -24,25 +24,27 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static files (uploads)
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use(['/uploads', '/api/uploads'], express.static(path.join(process.cwd(), 'uploads')));
 
 // Health check
-app.get('/health', (_req, res) => {
+app.get(['/health', '/api/health'], (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API routes
-app.use('/api/auth', authRouter);
-app.use('/api/reports', reportsRouter);
-app.use('/api/kelurahans', kelurahansRouter);
-app.use('/api/stats', statsRouter);
+// API routes (supports both /api/auth and /auth when rewritten by Vercel)
+app.use(['/api/auth', '/auth'], authRouter);
+app.use(['/api/reports', '/reports'], reportsRouter);
+app.use(['/api/kelurahans', '/kelurahans'], kelurahansRouter);
+app.use(['/api/stats', '/stats'], statsRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`🚀 Backend running at http://localhost:${PORT}`);
-  console.log(`   Environment: ${process.env.NODE_ENV}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Backend running at http://localhost:${PORT}`);
+    console.log(`   Environment: ${process.env.NODE_ENV}`);
+  });
+}
 
 export default app;

@@ -34,7 +34,7 @@ const LoginPage: React.FC = () => {
   const handleDemo = async (role: 'warga' | 'petugas') => {
     const credentials = {
       warga: { email: 'demo@petasuarakota.id', password: 'password123' },
-      petugas: { email: 'petugas1@petasuarakota.id', password: 'password123' },
+      petugas: { email: 'petugas.pu@petasuarakota.id', password: 'password123' },
     };
     const cred = credentials[role];
     try {
