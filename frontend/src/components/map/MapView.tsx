@@ -22,7 +22,7 @@ if (MAPBOX_TOKEN) {
 export type MapStyleMode = 'peta' | 'satelit';
 
 const MAP_STYLES: Record<MapStyleMode, string> = {
-  peta: 'mapbox://styles/mapbox/dark-v11',
+  peta: 'mapbox://styles/mapbox/light-v11',
   satelit: 'mapbox://styles/mapbox/satellite-streets-v12',
 };
 
@@ -105,10 +105,25 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
   const mapStyleRef = useRef<MapStyleMode>(mapStyle);
   mapStyleRef.current = mapStyle;
 
-  const { filteredReports, selectedReport, filter, fetchViewportReports } = useReportsStore();
+  const { filteredReports, selectedReport, filter, hoveredReportId, fetchViewportReports } = useReportsStore();
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
+
+  // Efek pulse pin saat kartu laporan di sidebar di-hover
+  useEffect(() => {
+    if (!hoveredReportId) {
+      document.querySelectorAll('.pin-pulse-active').forEach((el) => {
+        el.classList.remove('pin-pulse-active');
+      });
+      return;
+    }
+    const pinEl = document.getElementById(`map-pin-${hoveredReportId}`);
+    if (pinEl) {
+      const inner = pinEl.querySelector('.psk-pin-inner');
+      inner?.classList.add('pin-pulse-active');
+    }
+  }, [hoveredReportId]);
 
   // Simpan data & props ke ref agar listener stabil dan tidak men-trigger re-attach yang tak perlu
   const filteredReportsRef = useRef(filteredReports);
@@ -315,32 +330,32 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
         type: 'fill',
         source: 'kecamatan-source',
         paint: {
-          'fill-color': '#C9972F', // Mustard accent senada tema dark/paper
+          'fill-color': '#D4C9B2', // Warm paper kraft highlight
           'fill-opacity': [
             'case',
             ['==', ['downcase', ['get', 'name']], currentKec],
-            0.22,
+            0.32,
             0,
           ],
         },
       });
     }
 
-    // Layer border: garis tipis flat tanpa glow, netral kontras di peta gelap
+    // Layer border: garis tipis flat tanpa glow, netral
     if (!map.getLayer('kecamatan-border')) {
       map.addLayer({
         id: 'kecamatan-border',
         type: 'line',
         source: 'kecamatan-source',
         paint: {
-          'line-color': isSatellite ? '#FAF6EE' : '#D4C5A9',
+          'line-color': isSatellite ? '#FAF6EE' : '#B8AC94',
           'line-width': [
             'case',
             ['==', ['downcase', ['get', 'name']], currentKec],
-            2.2,
-            1.2,
+            2,
+            1,
           ],
-          'line-opacity': isSatellite ? 0.85 : 0.65,
+          'line-opacity': 0.75,
         },
       });
     }
@@ -358,6 +373,14 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
         cluster: true,
         clusterMaxZoom: 14,
         clusterRadius: 40,
+        clusterProperties: {
+          has_critical: ['any', ['>=', ['get', 'skorUrgensi'], 80]],
+          inf_count: ['+', ['case', ['==', ['get', 'category'], 'INFRASTRUKTUR'], 1, 0]],
+          keb_count: ['+', ['case', ['==', ['get', 'category'], 'KEBERSIHAN'], 1, 0]],
+          kea_count: ['+', ['case', ['==', ['get', 'category'], 'KEAMANAN'], 1, 0]],
+          ban_count: ['+', ['case', ['==', ['get', 'category'], 'BANJIR'], 1, 0]],
+          lai_count: ['+', ['case', ['==', ['get', 'category'], 'LAINNYA'], 1, 0]],
+        },
       });
     } else {
       (map.getSource('reports-source') as mapboxgl.GeoJSONSource).setData(
@@ -365,7 +388,7 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       );
     }
 
-    // 2. Layer Cluster Circles (Paper Board Stamp Bubble — tidak diubah)
+    // 2. Layer Cluster Circles (Sesuai dominan kategori & ring merah jika ada kritis)
     if (!map.getLayer('clusters')) {
       map.addLayer({
         id: 'clusters',
@@ -373,32 +396,40 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
         source: 'reports-source',
         filter: ['has', 'point_count'],
         paint: {
+          // Warna sesuai kategori dominan
           'circle-color': [
-            'step',
-            ['get', 'point_count'],
-            '#E8D9B5', // < 10: Paper kraft
-            10,
-            '#C9972F', // 10 - 49: Mustard
-            50,
-            '#B23327', // >= 50: Stamp Red
+            'case',
+            ['>=', ['get', 'ban_count'], ['max', ['get', 'inf_count'], ['get', 'keb_count'], ['get', 'kea_count'], ['get', 'lai_count']]],
+            '#2A7F86', // Banjir
+            ['>=', ['get', 'inf_count'], ['max', ['get', 'keb_count'], ['get', 'kea_count'], ['get', 'lai_count']]],
+            '#3E5C76', // Infrastruktur
+            ['>=', ['get', 'keb_count'], ['max', ['get', 'kea_count'], ['get', 'lai_count']]],
+            '#5E7C4A', // Kebersihan
+            ['>=', ['get', 'kea_count'], ['get', 'lai_count']],
+            '#5B3F6E', // Keamanan
+            '#8A7F70',  // Lainnya
           ],
+          // Ukuran berdasarkan jumlah titik
           'circle-radius': [
             'step',
             ['get', 'point_count'],
-            16,
+            15,
             10,
-            22,
-            50,
-            28,
+            20,
+            30,
+            25,
+            60,
+            30,
           ],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': isSatellite ? '#FAF6EE' : '#2B2822',
-          'circle-opacity': 0.95,
+          // Ring merah tipis jika terdapat laporan kritis di dalam cluster
+          'circle-stroke-width': ['case', ['get', 'has_critical'], 3, 1.8],
+          'circle-stroke-color': ['case', ['get', 'has_critical'], '#C0392B', isSatellite ? '#FAF6EE' : '#1E1B16'],
+          'circle-opacity': 0.94,
         },
       });
     }
 
-    // 3. Layer Cluster Count Label (tidak diubah)
+    // 3. Layer Cluster Count Label
     if (!map.getLayer('cluster-count')) {
       map.addLayer({
         id: 'cluster-count',
@@ -407,11 +438,11 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
         filter: ['has', 'point_count'],
         layout: {
           'text-field': ['get', 'point_count_abbreviated'],
-          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+          'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
           'text-size': 12,
         },
         paint: {
-          'text-color': '#2B2822',
+          'text-color': '#FAF6EE',
         },
       });
     }

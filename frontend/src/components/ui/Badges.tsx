@@ -1,21 +1,23 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import {
-  IconTool,
-  IconTrash,
-  IconShield,
-  IconDroplet,
-  IconDots,
-  IconClock,
-  IconCheck,
-  IconX,
-  IconFileText,
-  IconAlertTriangle,
-} from '@tabler/icons-react';
-import { getUrgencyLevel, URGENCY_LABELS, STATUS_LABELS, CATEGORY_LABELS } from '../../types';
-import type { Report, UrgencyLevel, ReportCategory } from '../../types';
+  getUrgencyLevel,
+  URGENCY_LABELS,
+  STATUS_LABELS_SURABAYA,
+  CATEGORY_LABELS,
+  CATEGORY_COLORS,
+} from '../../types';
+import type { Report, UrgencyLevel, ReportCategory, ReportStatus } from '../../types';
+import {
+  CategoryGlyph,
+  StatusShape,
+  IllustrationTuguPahlawanUmbrella,
+} from './SurabayaIllustrations';
 
-// ─── UrgencyBadge (Solid Circular Dot with Text Label) ────────────────────────
+// ─── UrgencyBadge: Severity Accent (Red is ONLY for severity) ─────────────────
+// Critical = red dot + 4px left border
+// High = orange dot + 2px left border
+// Medium/Low = no accent
 
 interface UrgencyBadgeProps {
   score: number;
@@ -26,49 +28,30 @@ interface UrgencyBadgeProps {
 export const UrgencyBadge: React.FC<UrgencyBadgeProps> = ({ score, showScore = true, className }) => {
   const level = getUrgencyLevel(score);
 
-  const styleMap: Record<UrgencyLevel, { bg: string; dot: string; text: string; border: string }> = {
-    kritis: {
-      bg: 'bg-[#B23327]/10',
-      border: 'border-[#B23327]',
-      text: 'text-[#B23327]',
-      dot: 'bg-[#B23327]',
-    },
-    tinggi: {
-      bg: 'bg-[#C9972F]/10',
-      border: 'border-[#C9972F]',
-      text: 'text-[#8A6414]',
-      dot: 'bg-[#C9972F]',
-    },
-    sedang: {
-      bg: 'bg-[#C9972F]/10',
-      border: 'border-[#C9972F]',
-      text: 'text-[#8A6414]',
-      dot: 'bg-[#C9972F]',
-    },
-    rendah: {
-      bg: 'bg-[#4A7A6E]/10',
-      border: 'border-[#4A7A6E]',
-      text: 'text-[#2D5249]',
-      dot: 'bg-[#4A7A6E]',
-    },
-  };
+  if (level === 'rendah' || level === 'sedang') {
+    return (
+      <span className={clsx('inline-flex items-center gap-1 text-[11px] font-mono text-ink-dim', className)}>
+        {showScore && <span className="opacity-75">{score}</span>}
+      </span>
+    );
+  }
 
-  const current = styleMap[level];
+  const isCritical = level === 'kritis';
+  const dotColor = isCritical ? 'bg-severity-critical' : 'bg-severity-high';
+  const textColor = isCritical ? 'text-severity-critical' : 'text-severity-high';
 
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-sans font-medium border bg-paper-white',
-        current.border,
-        current.text,
+        'inline-flex items-center gap-1.5 text-[11px] font-sans font-medium',
+        textColor,
         className
       )}
     >
-      {/* Lingkaran kecil solid warna sesuai level */}
-      <span className={clsx('w-2 h-2 rounded-full shrink-0', current.dot)} />
+      <span className={clsx('w-2 h-2 rounded-full shrink-0', dotColor)} />
       <span>{URGENCY_LABELS[level]}</span>
       {showScore && (
-        <span className="font-mono text-[11px] opacity-75 border-l border-current/30 pl-1">
+        <span className="font-mono text-[10px] opacity-80 border-l border-current/30 pl-1">
           {score}
         </span>
       )}
@@ -76,63 +59,60 @@ export const UrgencyBadge: React.FC<UrgencyBadgeProps> = ({ score, showScore = t
   );
 };
 
-// ─── StatusBadge (Document Paper Badge) ────────────────────────────────────────
+// ─── StatusBadge: Shape-Based (No Extra Colors) ───────────────────────────────
+// Baru = outlined, Diproses = half-filled, Selesai = filled check
 
 interface StatusBadgeProps {
-  status: Report['status'];
+  status: ReportStatus;
   className?: string;
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) => {
-  const statusConfig: Record<
-    Report['status'],
-    { border: string; bg: string; text: string; icon: React.ReactNode }
-  > = {
-    BARU: {
-      border: 'border-ink',
-      bg: 'bg-paper-kraft',
-      text: 'text-ink',
-      icon: <IconFileText className="w-3.5 h-3.5 stroke-[1.5]" />,
-    },
-    DIPROSES: {
-      border: 'border-[#C9972F]',
-      bg: 'bg-[#C9972F]/15',
-      text: 'text-[#7D5B11]',
-      icon: <IconClock className="w-3.5 h-3.5 stroke-[1.5]" />,
-    },
-    SELESAI: {
-      border: 'border-[#4A7A6E]',
-      bg: 'bg-[#4A7A6E]/15',
-      text: 'text-[#2D5249]',
-      icon: <IconCheck className="w-3.5 h-3.5 stroke-[2]" />,
-    },
-    DITOLAK: {
-      border: 'border-stamp-red',
-      bg: 'bg-stamp-red/10',
-      text: 'text-stamp-red',
-      icon: <IconX className="w-3.5 h-3.5 stroke-[2]" />,
-    },
-  };
-
-  const conf = statusConfig[status];
+  const label = STATUS_LABELS_SURABAYA[status] || status;
 
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-sans font-medium border',
-        conf.border,
-        conf.bg,
-        conf.text,
+        'inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-sans text-ink border border-border-paper bg-paper-white rounded-[2px]',
         className
       )}
     >
-      {conf.icon}
-      <span>{STATUS_LABELS[status]}</span>
+      <StatusShape status={status} size={12} className="text-ink" />
+      <span className="font-medium">{label}</span>
     </span>
   );
 };
 
-// ─── Official Verification Stamp (Lingkaran ganda untuk status verifikasi) ────
+// ─── CategoryBadge: Small Icon + Muted Color Left Border (Never Filled) ───────
+
+interface CategoryBadgeProps {
+  category: ReportCategory;
+  className?: string;
+}
+
+export const getCategoryIcon = (category: ReportCategory, className = 'w-3.5 h-3.5') => {
+  const catColor = CATEGORY_COLORS[category] || '#8A7F70';
+  return <CategoryGlyph category={category} strokeColor={catColor} className={className} />;
+};
+
+export const CategoryBadge: React.FC<CategoryBadgeProps> = ({ category, className }) => {
+  const catColor = CATEGORY_COLORS[category] || '#8A7F70';
+
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-sans font-medium text-ink bg-paper-white border border-border-paper rounded-[2px]',
+        className
+      )}
+      style={{ borderLeftWidth: '3px', borderLeftColor: catColor }}
+    >
+      <CategoryGlyph category={category} strokeColor={catColor} size={13} />
+      <span>{CATEGORY_LABELS[category]}</span>
+    </span>
+  );
+};
+
+// ─── Official Verification Stamp ──────────────────────────────────────────────
 
 interface OfficialStampProps {
   label?: string;
@@ -141,61 +121,24 @@ interface OfficialStampProps {
 }
 
 export const OfficialVerificationStamp: React.FC<OfficialStampProps> = ({
-  label = 'TERVERIFIKASI',
-  sublabel = 'PEMKOT SBY',
+  label = 'TERCATAT',
+  sublabel = 'KOTA SURABAYA',
   className,
 }) => {
   return (
     <div
       className={clsx(
-        'official-stamp inline-flex flex-col items-center justify-center select-none rotate-[-4deg] scale-90 sm:scale-100',
+        'inline-flex flex-col items-center justify-center select-none border border-ink/40 px-2 py-0.5 rounded-[2px] bg-paper-kraft/40 text-ink',
         className
       )}
     >
-      <span className="text-[10px] leading-tight font-bold tracking-wider">{label}</span>
-      <span className="text-[8px] tracking-widest text-stamp-red/80">{sublabel}</span>
+      <span className="text-[9px] font-sans font-bold tracking-wider uppercase leading-tight">{label}</span>
+      <span className="text-[7.5px] font-mono tracking-widest text-ink-dim uppercase">{sublabel}</span>
     </div>
   );
 };
 
-// ─── CategoryBadge (Paper Category Tag) ───────────────────────────────────────
-
-interface CategoryBadgeProps {
-  category: Report['category'];
-  className?: string;
-}
-
-// Ikon sesuai makna: tool=infrastruktur, trash=kebersihan, shield=keamanan, droplet=banjir, dots=lainnya
-export const getCategoryIcon = (category: ReportCategory, className = 'w-3.5 h-3.5') => {
-  switch (category) {
-    case 'INFRASTRUKTUR':
-      return <IconTool className={className} stroke={1.5} />;
-    case 'KEBERSIHAN':
-      return <IconTrash className={className} stroke={1.5} />;
-    case 'KEAMANAN':
-      return <IconShield className={className} stroke={1.5} />;
-    case 'BANJIR':
-      return <IconDroplet className={className} stroke={1.5} />;
-    default:
-      return <IconDots className={className} stroke={1.5} />;
-  }
-};
-
-export const CategoryBadge: React.FC<CategoryBadgeProps> = ({ category, className }) => {
-  return (
-    <span
-      className={clsx(
-        'inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-sans font-medium border border-ink bg-paper-white text-ink',
-        className
-      )}
-    >
-      {getCategoryIcon(category, 'w-3 h-3 text-ink/70')}
-      <span>{CATEGORY_LABELS[category]}</span>
-    </span>
-  );
-};
-
-// ─── LoadingSpinner (Clean Paper Spinner) ─────────────────────────────────────
+// ─── LoadingSpinner: Newspaper Ink Spinner ────────────────────────────────────
 
 interface SpinnerProps {
   size?: 'sm' | 'md' | 'lg';
@@ -203,35 +146,41 @@ interface SpinnerProps {
 }
 
 export const LoadingSpinner: React.FC<SpinnerProps> = ({ size = 'md', className }) => {
-  const sizes = { sm: 'w-4 h-4', md: 'w-7 h-7', lg: 'w-10 h-10' };
+  const sizes = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8' };
   return (
     <div className={clsx(sizes[size], 'relative flex items-center justify-center', className)}>
-      <div className="absolute inset-0 rounded-full border border-paper-kraft/40" />
-      <div className="absolute inset-0 rounded-full border-2 border-paper-kraft border-t-transparent animate-spin" />
+      <div className="absolute inset-0 rounded-full border border-border-paper" />
+      <div className="absolute inset-0 rounded-full border-2 border-ink border-t-transparent animate-spin" />
     </div>
   );
 };
 
-// ─── EmptyState (Paper Document Blank) ─────────────────────────────────────────
+// ─── EmptyState: Surabaya Civic Editorial Empty State ─────────────────────────
 
 interface EmptyStateProps {
-  title: string;
+  title?: string;
   description?: string;
   action?: React.ReactNode;
+  illustration?: React.ReactNode;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ title, description, action }) => (
-  <div className="flex flex-col items-center justify-center py-8 px-4 text-center border border-ink/40 bg-paper-white">
-    <div className="w-10 h-10 mb-2.5 flex items-center justify-center border border-ink text-ink bg-paper-kraft">
-      <IconFileText className="w-5 h-5 stroke-[1.5]" />
+export const EmptyState: React.FC<EmptyStateProps> = ({
+  title = 'Aman, Rek. Belum ada laporan di sini.',
+  description,
+  action,
+  illustration,
+}) => (
+  <div className="flex flex-col items-center justify-center py-8 px-4 text-center bg-paper-white border border-border-paper rounded-[2px]">
+    <div className="mb-3 flex items-center justify-center">
+      {illustration || <IllustrationTuguPahlawanUmbrella className="w-28 h-28" />}
     </div>
-    <h3 className="font-sans font-semibold text-ink text-sm mb-1">{title}</h3>
-    {description && <p className="text-ink/70 text-xs font-sans max-w-xs mb-3">{description}</p>}
+    <h3 className="font-serif font-bold text-ink text-sm mb-1">{title}</h3>
+    {description && <p className="text-ink-dim text-xs font-sans max-w-xs mb-3">{description}</p>}
     {action}
   </div>
 );
 
-// ─── Avatar (Paper ID Tag) ───────────────────────────────────────────────────
+// ─── Avatar: Clean Newspaper ID ───────────────────────────────────────────────
 
 interface AvatarProps {
   name: string;
@@ -240,15 +189,20 @@ interface AvatarProps {
 }
 
 export const Avatar: React.FC<AvatarProps> = ({ name, src, size = 'md' }) => {
-  const sizes = { sm: 'w-6 h-6 text-[10px]', md: 'w-8 h-8 text-xs', lg: 'w-10 h-10 text-sm' };
-  const initials = name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase();
+  const sizes = { sm: 'w-5 h-5 text-[9px]', md: 'w-7 h-7 text-xs', lg: 'w-9 h-9 text-sm' };
+  const initials = name
+    .split(' ')
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
   if (src) {
     return (
       <img
         src={src}
         alt={name}
-        className={clsx(sizes[size], 'object-cover border border-ink rounded-none')}
+        className={clsx(sizes[size], 'object-cover border border-border-paper rounded-[2px]')}
       />
     );
   }
@@ -257,7 +211,7 @@ export const Avatar: React.FC<AvatarProps> = ({ name, src, size = 'md' }) => {
     <div
       className={clsx(
         sizes[size],
-        'flex items-center justify-center font-mono font-bold text-ink bg-paper-kraft border border-ink'
+        'flex items-center justify-center font-mono font-bold text-ink bg-paper-kraft border border-border-paper rounded-[2px]'
       )}
     >
       {initials}
@@ -265,17 +219,15 @@ export const Avatar: React.FC<AvatarProps> = ({ name, src, size = 'md' }) => {
   );
 };
 
-// ─── SkeletonCard (Paper Card Skeleton) ────────────────────────────────────────
+// ─── SkeletonCard ─────────────────────────────────────────────────────────────
 
 export const SkeletonCard: React.FC = () => (
-  <div className="p-3 border border-ink/30 bg-paper-white/70 space-y-2.5 animate-pulse">
-    <div className="h-3.5 bg-ink/15 w-3/4" />
-    <div className="h-2.5 bg-ink/10 w-1/2" />
+  <div className="p-3 border border-border-paper bg-paper-white space-y-2 rounded-[2px] animate-pulse">
+    <div className="h-3 bg-border-paper/40 w-3/4 rounded-[2px]" />
+    <div className="h-2 bg-border-paper/25 w-1/2 rounded-[2px]" />
     <div className="flex gap-2 pt-1">
-      <div className="h-4 w-14 bg-ink/10" />
-      <div className="h-4 w-16 bg-ink/10" />
+      <div className="h-3 w-12 bg-border-paper/30 rounded-[2px]" />
+      <div className="h-3 w-14 bg-border-paper/30 rounded-[2px]" />
     </div>
   </div>
 );
-
-

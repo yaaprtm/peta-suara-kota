@@ -109,10 +109,20 @@ export type MapFilter = {
   startDate?: string;
   endDate?: string;
   category?: ReportCategory;
+  categories?: ReportCategory[];
   status?: ReportStatus;
   minScore?: number;
   maxScore?: number;
   kecamatan?: string;
+  onlyCritical?: boolean;
+};
+
+export const CATEGORY_COLORS: Record<ReportCategory, string> = {
+  INFRASTRUKTUR: '#3E5C76',
+  KEBERSIHAN: '#5E7C4A',
+  KEAMANAN: '#5B3F6E',
+  BANJIR: '#2A7F86',
+  LAINNYA: '#8A7F70',
 };
 
 export const CATEGORY_LABELS: Record<ReportCategory, string> = {
@@ -135,6 +145,13 @@ export const STATUS_LABELS: Record<ReportStatus, string> = {
   BARU: 'Baru',
   DIPROSES: 'Diproses',
   SELESAI: 'Selesai',
+  DITOLAK: 'Ditolak',
+};
+
+export const STATUS_LABELS_SURABAYA: Record<ReportStatus, string> = {
+  BARU: 'Baru masuk',
+  DIPROSES: 'Lagi diproses',
+  SELESAI: 'Wes beres',
   DITOLAK: 'Ditolak',
 };
 

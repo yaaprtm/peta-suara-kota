@@ -16,6 +16,8 @@ interface ReportsState {
   currentBbox: string | null;
   currentZoom: number;
 
+  hoveredReportId: string | null;
+  setHoveredReportId: (id: string | null) => void;
   fetchReports: () => Promise<void>;
   fetchViewportReports: (bbox: string, zoom: number) => Promise<void>;
   setSelectedReport: (report: Report | null) => void;
@@ -31,12 +33,17 @@ function applyFilters(reports: Report[], filter: MapFilter, timeRange: { start: 
   return reports.filter(r => {
     const date = parseISO(r.createdAt);
     if (isBefore(date, timeRange.start) || isAfter(date, timeRange.end)) return false;
-    if (filter.category && r.category !== filter.category) return false;
+    if (filter.categories && filter.categories.length > 0) {
+      if (!filter.categories.includes(r.category)) return false;
+    } else if (filter.category && r.category !== filter.category) {
+      return false;
+    }
     if (filter.status && r.status !== filter.status) return false;
     if (filter.kecamatan) {
       const reportKec = r.kecamatan || r.kelurahan?.kecamatan;
       if (!reportKec || reportKec.toLowerCase() !== filter.kecamatan.toLowerCase()) return false;
     }
+    if (filter.onlyCritical && r.skorUrgensi < 80) return false;
     if (filter.minScore !== undefined && r.skorUrgensi < filter.minScore) return false;
     if (filter.maxScore !== undefined && r.skorUrgensi > filter.maxScore) return false;
     return true;
@@ -59,6 +66,8 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
   isPanelOpen: false,
   currentBbox: null,
   currentZoom: 12.5,
+  hoveredReportId: null,
+  setHoveredReportId: (id) => set({ hoveredReportId: id }),
 
   fetchReports: async () => {
     set({ isLoading: true, error: null });

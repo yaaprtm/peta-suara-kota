@@ -2,23 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Peta Suara Kota Design Tokens ───────────────────────────────────────── */
+/* ─── Peta Suara Kota Design Tokens (Civic Newspaper & Surabaya Identity) ─── */
 
 :root {
-  --ink: #2B2822;
+  --paper-bg: #F4EEDF;
   --paper-white: #FAF6EE;
+  --paper-card: #FAF6EE;
   --paper-kraft: #E8D9B5;
-  --paper-blue: #D9E2E0;
-  --stamp-red: #B23327;
-  --mustard: #C9972F;
-  --muted-teal: #4A7A6E;
-  --board-bg: #241F1B;
+  --ink: #1E1B16;
+  --ink-dim: #5E584E;
+  --ink-muted: #8E8679;
+  --border-paper: #CFC4AB;
+  --border-subtle: #E2D9C5;
 
-  /* Urgency Aliases */
-  --kritis: #B23327;
-  --tinggi: #C9972F;
-  --sedang: #C9972F;
-  --rendah: #4A7A6E;
+  /* Red is reserved ONLY for severity */
+  --severity-critical: #C0392B;
+  --severity-high: #D9822B;
+
+  /* Category colors */
+  --cat-infrastruktur: #3E5C76;
+  --cat-kebersihan: #5E7C4A;
+  --cat-keamanan: #5B3F6E;
+  --cat-banjir: #2A7F86;
+  --cat-lainnya: #8A7F70;
 }
 
 *, *::before, *::after {
@@ -30,7 +36,7 @@ html, body, #root {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: var(--board-bg);
+  background-color: var(--paper-bg);
   color: var(--ink);
 }
 
@@ -40,104 +46,67 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Physical Paper & Bulletin Board Utilities ────────────────────────────── */
+/* ─── Paper Texture & Civic Newspaper Patterns ────────────────────────────── */
 
-/* Base Paper Document Card (Solid color, 1px border ink, NO box-shadow) */
+.paper-grain {
+  background-color: var(--paper-bg);
+  background-image: radial-gradient(rgba(30, 27, 22, 0.04) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/* Subtle red-and-white accent line under top bar */
+.surabaya-accent-line {
+  height: 2px;
+  width: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    #C0392B,
+    #C0392B 12px,
+    #FAF6EE 12px,
+    #FAF6EE 24px
+  );
+}
+
+/* Base Paper Document Card (2px rounded, 1px border) */
 .paper-card {
-  border: 1px solid var(--ink);
-  box-shadow: none;
-  transition: transform 0.15s ease-in-out;
-}
-
-.paper-white {
+  border: 1px solid var(--border-paper);
   background-color: var(--paper-white);
-  color: var(--ink);
+  border-radius: 2px;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
-.paper-kraft {
-  background-color: var(--paper-kraft);
-  color: var(--ink);
+.paper-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--ink);
+  box-shadow: 0 2px 4px rgba(30, 27, 22, 0.08);
 }
 
-.paper-blue {
-  background-color: var(--paper-blue);
-  color: var(--ink);
-}
-
-/* Subtle Board Felt Texture Background */
-.board-pattern {
-  background-color: var(--board-bg);
-  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 16px 16px;
-}
-
-/* Paper clip / pinned metal accent */
-.paper-clip {
-  position: absolute;
-  top: -8px;
-  left: 20px;
-  width: 14px;
-  height: 24px;
-  border: 2px solid #5C5850;
-  border-radius: 8px 8px 0 0;
-  background: transparent;
-  pointer-events: none;
-  z-index: 10;
-}
-
-/* Verification Official Stamp (Double circle border, short text) */
-.official-stamp {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 2px double var(--stamp-red);
-  border-radius: 9999px;
-  color: var(--stamp-red);
-  font-family: 'Courier Prime', monospace;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 4px 8px;
-  line-height: 1.1;
-  user-select: none;
-}
-
-/* Critical Urgency Limited Tilt (-2 to 2 deg) */
-.tilt-kritis-left {
-  transform: rotate(-1.5deg);
-}
-
-.tilt-kritis-right {
-  transform: rotate(1.5deg);
-}
-
-/* ─── Clean Custom Scrollbars ──────────────────────────────────────────────── */
+/* ─── Clean Custom Scrollbars in Warm Paper Palette ───────────────────────── */
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--board-bg);
+  background: var(--paper-bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(232, 217, 181, 0.3);
-  border-radius: 3px;
+  background: #D4C9B2;
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--paper-kraft);
+  background: var(--border-paper);
 }
 
-/* ─── Form Elements & Checkboxes ───────────────────────────────────────────── */
+/* ─── Components ──────────────────────────────────────────────────────────── */
 
 @layer components {
   /* Real Form Checkbox */
   .paper-checkbox {
     appearance: none;
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     border: 1.5px solid var(--ink);
     background-color: var(--paper-white);
     border-radius: 2px;
@@ -151,53 +120,49 @@ body {
     background-color: var(--ink);
   }
 
-  .paper-checkbox:focus-visible {
-    outline: 2px solid var(--ink);
-    outline-offset: 2px;
-  }
-
-  /* Paper Button */
+  /* Paper Primary Button (No generic gradients) */
   .btn-paper-primary {
-    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 font-body font-medium text-sm text-ink
-           border border-ink bg-paper-kraft hover:bg-paper-white active:translate-y-[1px]
-           transition-all duration-100 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 font-sans font-medium text-xs text-paper-white
+           border border-ink bg-ink hover:bg-ink-dim active:translate-y-[1px]
+           rounded-[2px] transition-all duration-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer select-none;
   }
 
-  .btn-paper-danger {
-    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 font-body font-medium text-sm text-paper-white
-           border border-ink bg-stamp-red hover:opacity-95 active:translate-y-[1px]
-           transition-all duration-100 disabled:opacity-50;
-  }
-
+  /* Paper Secondary Button */
   .btn-paper-secondary {
-    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 font-body font-normal text-xs text-ink
-           border border-ink bg-paper-white hover:bg-paper-blue active:translate-y-[1px]
-           transition-all duration-100;
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 font-sans font-medium text-xs text-ink
+           border border-border-paper bg-paper-white hover:bg-paper-kraft hover:border-ink active:translate-y-[1px]
+           rounded-[2px] transition-all duration-100 cursor-pointer select-none;
+  }
+
+  /* Danger Button */
+  .btn-paper-danger {
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 font-sans font-medium text-xs text-paper-white
+           border border-ink bg-severity-critical hover:opacity-95 active:translate-y-[1px]
+           rounded-[2px] transition-all duration-100 cursor-pointer select-none;
   }
 
   /* Paper Inputs */
   .input-paper {
-    @apply w-full bg-paper-white border border-ink text-ink
-           placeholder-ink/40 px-3 py-2 text-sm font-body
-           focus:outline-none focus:ring-1 focus:ring-ink
+    @apply w-full bg-paper-white border border-border-paper text-ink
+           placeholder-ink-muted px-3 py-2 text-xs font-sans rounded-[2px]
+           focus:outline-none focus:border-ink
            transition-all duration-100;
   }
 }
 
-/* ─── Mapbox GL Controls Override ──────────────────────────────────────────── */
-/* Ganti tombol zoom/kompas default (putih generik) ke palet desain kertas.    */
+/* ─── Mapbox GL Controls Override ─────────────────────────────────────────── */
 
 .mapboxgl-ctrl-group {
   background: var(--paper-white) !important;
-  border: 1px solid var(--ink) !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+  border: 1px solid var(--border-paper) !important;
+  border-radius: 2px !important;
+  box-shadow: 0 1px 3px rgba(30, 27, 22, 0.08) !important;
 }
 
 .mapboxgl-ctrl-group button {
   background-color: var(--paper-white) !important;
   color: var(--ink) !important;
-  border-bottom: 1px solid rgba(43, 40, 34, 0.25) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
   border-radius: 0 !important;
   width: 28px !important;
   height: 28px !important;
@@ -211,29 +176,26 @@ body {
   background-color: var(--paper-kraft) !important;
 }
 
-/* Ikon SVG di dalam tombol — paksa warna ink */
 .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
   filter: invert(0%) sepia(0%) saturate(0%) brightness(0%) contrast(100%) !important;
   opacity: 0.8;
 }
 
-/* Kompas arrow — pakai warna ink juga */
 .mapboxgl-ctrl-compass .mapboxgl-ctrl-icon {
   filter: invert(15%) sepia(18%) saturate(400%) hue-rotate(10deg) brightness(30%) contrast(80%) !important;
 }
 
-/* Atribusi Mapbox — tetap kecil dan tidak mengganggu */
 .mapboxgl-ctrl-attrib {
-  background: rgba(250, 246, 238, 0.85) !important;
-  color: rgba(43, 40, 34, 0.6) !important;
+  background: rgba(244, 238, 223, 0.88) !important;
+  color: var(--ink-dim) !important;
   font-size: 9px !important;
   font-family: 'Courier Prime', monospace !important;
-  border-radius: 0 !important;
-  border: none !important;
+  border-radius: 2px !important;
+  border: 1px solid var(--border-paper) !important;
 }
 
 .mapboxgl-ctrl-attrib a {
-  color: rgba(43, 40, 34, 0.6) !important;
+  color: var(--ink) !important;
 }
 
 /* ─── Peta Suara Kota Custom Pin System ───────────────────────────────────── */
@@ -252,7 +214,7 @@ body {
 .psk-pin-inner {
   display: block;
   outline: none;
-  transition: transform 150ms ease;
+  transition: transform 150ms ease, filter 150ms ease;
   user-select: none;
 }
 
@@ -266,72 +228,36 @@ body {
 
 .psk-pin-inner:hover,
 .psk-pin-inner:focus-visible {
-  transform: translateY(-3px) scale(1.1);
+  transform: translateY(-3px) scale(1.12);
 }
 
-.psk-pin-inner:focus-visible {
-  filter: drop-shadow(0 0 2px #FAF6EE);
+/* Hover Pulse Once from Sidebar Card Hover */
+@keyframes pin-single-pulse {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-5px) scale(1.25); filter: drop-shadow(0 4px 6px rgba(30, 27, 22, 0.25)); }
+  100% { transform: translateY(-3px) scale(1.1); filter: drop-shadow(0 2px 4px rgba(30, 27, 22, 0.2)); }
 }
 
-/* Keyframe Animasi Denyut (Scale + Fade, 2s, Infinite) */
-@keyframes pin-pulse-scale {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.12);
-    opacity: 0.25;
-  }
-  100% {
-    transform: scale(0.9);
-    opacity: 0.8;
-  }
+.pin-pulse-active {
+  animation: pin-single-pulse 0.45s ease-out forwards;
+  z-index: 1100 !important;
 }
 
-.pin-pulse-ring {
-  transform-origin: 40px 40px;
-  animation: pin-pulse-scale 2s infinite ease-in-out;
+/* Keyframe Animasi Denyut untuk Severity Kritis */
+@keyframes pin-critical-pulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 0.25; }
+  100% { transform: scale(0.9); opacity: 0.8; }
 }
 
-.pin-pulse-inner {
-  transform-origin: 40px 40px;
-  animation: pin-pulse-scale 2s infinite ease-in-out 0.3s;
+.pin-critical-ring {
+  transform-origin: center center;
+  animation: pin-critical-pulse 2s infinite ease-in-out;
 }
 
-/* Radar Denyut untuk Default Kritis */
-@keyframes pin-radar-expand {
-  0% {
-    transform: scale(0.92);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.2;
-  }
-  100% {
-    transform: scale(0.92);
-    opacity: 0.7;
-  }
-}
-
-.pin-radar-ring {
-  transform-origin: 34px 27px;
-  animation: pin-radar-expand 2s infinite ease-in-out;
-}
-
-.pin-radar-ring-outer {
-  transform-origin: 34px 27px;
-  animation: pin-radar-expand 2s infinite ease-in-out 0.5s;
-}
-
-/* Menghormati prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
-  .pin-pulse-ring,
-  .pin-pulse-inner,
-  .pin-radar-ring,
-  .pin-radar-ring-outer {
+  .pin-critical-ring,
+  .pin-pulse-active {
     animation: none !important;
   }
 }
-

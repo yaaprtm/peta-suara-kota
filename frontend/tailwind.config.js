@@ -7,28 +7,51 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Peta Suara Kota Design Tokens
-        ink: '#2B2822',
+        // Civic Newspaper Design Tokens
+        paper: '#F4EEDF',
+        'paper-bg': '#F4EEDF',
         'paper-white': '#FAF6EE',
+        'paper-card': '#FAF6EE',
         'paper-kraft': '#E8D9B5',
-        'paper-blue': '#D9E2E0',
-        'stamp-red': '#B23327',
-        mustard: '#C9972F',
-        'muted-teal': '#4A7A6E',
-        'board-bg': '#241F1B',
+        ink: '#1E1B16',
+        'ink-dim': '#5E584E',
+        'ink-muted': '#8E8679',
+        'border-paper': '#CFC4AB',
+        'border-subtle': '#E2D9C5',
 
-        // Urgency token aliases
-        kritis: '#B23327',
-        tinggi: '#C9972F',
-        sedang: '#C9972F',
-        rendah: '#4A7A6E',
+        // Severity (Red is ONLY for severity)
+        'severity-critical': '#C0392B',
+        'severity-high': '#D9822B',
+        kritis: '#C0392B',
+        tinggi: '#D9822B',
+
+        // Category Identity Colors (Muted)
+        'cat-infrastruktur': '#3E5C76',
+        'cat-kebersihan': '#5E7C4A',
+        'cat-keamanan': '#5B3F6E',
+        'cat-banjir': '#2A7F86',
+        'cat-lainnya': '#8A7F70',
+
+        // Legacy / accent tokens
+        'board-bg': '#F4EEDF',
+        'stamp-red': '#C0392B',
+        'mustard': '#C9972F',
+        'paper-blue': '#E1EAF0',
       },
       fontFamily: {
-        wordmark: ['"Caveat"', 'cursive'],
-        handwriting: ['"Caveat"', 'cursive'],   // alias — same as wordmark
-        mono: ['"Courier Prime"', 'monospace'],
+        display: ['"Fraunces"', 'serif'],
+        serif: ['"Fraunces"', 'serif'],
+        wordmark: ['"Fraunces"', 'serif'],
         sans: ['"Inter"', 'sans-serif'],
         body: ['"Inter"', 'sans-serif'],
+        mono: ['"Courier Prime"', 'monospace'],
+      },
+      borderRadius: {
+        DEFAULT: '2px',
+        sm: '2px',
+        md: '2px',
+        lg: '2px',
+        xl: '2px',
       },
       boxShadow: {
         // Physical subtle borders & flat depth without digital glow slop

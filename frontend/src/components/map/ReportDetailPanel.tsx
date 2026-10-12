@@ -47,13 +47,13 @@ const ReportDetailPanel: React.FC = () => {
       try {
         await reportsApi.updateStatus(selectedReport.id, status, noteInput || undefined);
         updateReportStatus(selectedReport.id, status);
-        toast.success(`Status berhasil diperbarui: ${status}`, {
+        toast.success(`Status wes diperbarui: ${status}`, {
           style: { background: '#FAF6EE', color: '#2B2822', border: '1px solid #2B2822' },
         });
         setShowStatusForm(false);
         setNoteInput('');
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Gagal memperbarui status';
+        const msg = err instanceof Error ? err.message : 'Waduh, gagal update status. Coba lagi.';
         toast.error(msg);
       } finally {
         setIsUpdatingStatus(false);
@@ -114,8 +114,8 @@ const ReportDetailPanel: React.FC = () => {
         {report.status === 'SELESAI' && (
           <div className="p-3 bg-paper-kraft/40 border border-ink flex items-center justify-between">
             <div>
-              <div className="font-sans font-bold text-xs text-ink">Laporan Selesai & Terkonfirmasi</div>
-              <div className="font-mono text-[11px] text-ink/70">Petugas telah menindaklanjuti laporan ini.</div>
+              <div className="font-sans font-bold text-xs text-ink">Wes Beres & Terkonfirmasi</div>
+              <div className="font-mono text-[11px] text-ink/70">Petugas wes nangani laporan iki.</div>
             </div>
             <OfficialVerificationStamp label="SELESAI" sublabel="PEMKOT SBY" />
           </div>

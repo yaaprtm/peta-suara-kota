@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
-import { IconCalendar, IconRotateClockwise, IconActivity } from '@tabler/icons-react';
+import { IconRotateClockwise } from '@tabler/icons-react';
 import { useReportsStore } from '../../stores/reportsStore';
 
 const MIN_DATE = subDays(new Date(), 90);
@@ -16,7 +16,14 @@ function percentToDate(pct: number): Date {
   return new Date(MIN_DATE.getTime() + (pct / 100) * RANGE_MS);
 }
 
-// ─── TimeSlider (Physical Bulletin Time Range Controller) ───────────────────────
+const PRESETS = [
+  { label: '7 hari', days: 7 },
+  { label: '14 hari', days: 14 },
+  { label: '30 hari', days: 30 },
+  { label: '90 hari', days: 90 },
+];
+
+// ─── TimeSlider: One Slim Bar ──────────────────────────────────────────────────
 
 const TimeSlider: React.FC = () => {
   const { timeRange, setTimeRange, filteredReports } = useReportsStore();
@@ -35,10 +42,10 @@ const TimeSlider: React.FC = () => {
     return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
   }, []);
 
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
+  const handlePointerMove = useCallback(
+    (clientX: number) => {
       if (!dragging.current) return;
-      const pct = getPercent(e.clientX);
+      const pct = getPercent(clientX);
       const date = percentToDate(pct);
       if (dragging.current === 'start') {
         if (date < timeRange.end) setTimeRange(date, timeRange.end);
@@ -46,121 +53,123 @@ const TimeSlider: React.FC = () => {
         if (date > timeRange.start) setTimeRange(timeRange.start, date);
       }
     },
-    [dragging, getPercent, timeRange, setTimeRange]
+    [getPercent, timeRange, setTimeRange]
   );
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     dragging.current = null;
   }, []);
 
   useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('touchmove', (e) => {
-      if (!dragging.current || !e.touches[0]) return;
-      const pct = getPercent(e.touches[0].clientX);
-      const date = percentToDate(pct);
-      if (dragging.current === 'start' && date < timeRange.end) setTimeRange(date, timeRange.end);
-      if (dragging.current === 'end' && date > timeRange.start) setTimeRange(timeRange.start, date);
-    });
-    window.addEventListener('touchend', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchend', handleMouseUp);
+    const onMouseMove = (e: MouseEvent) => handlePointerMove(e.clientX);
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches[0]) handlePointerMove(e.touches[0].clientX);
     };
-  }, [handleMouseMove, handleMouseUp, getPercent, timeRange, setTimeRange]);
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('touchmove', onTouchMove);
+    window.addEventListener('touchend', handlePointerUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', handlePointerUp);
+    };
+  }, [handlePointerMove, handlePointerUp]);
+
+  // Determine which preset is currently active (if any)
+  const activePresetDays = PRESETS.find(({ days }) => {
+    const presetStart = subDays(new Date(), days);
+    return (
+      Math.abs(timeRange.start.getTime() - presetStart.getTime()) < 1000 * 60 * 60 &&
+      Math.abs(timeRange.end.getTime() - MAX_DATE.getTime()) < 1000 * 60 * 60
+    );
+  })?.days;
 
   return (
-    <div className="bg-paper-white border border-ink p-3 text-ink">
-      {/* Header Info */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <IconCalendar className="w-4 h-4 text-ink/70" />
-          <span className="text-ink/80 text-xs font-sans font-medium">
-            Rentang Waktu:&nbsp;
-            <span className="text-ink font-mono font-bold text-xs bg-paper-kraft/40 px-2 py-0.5 border border-ink/40">
-              {format(timeRange.start, 'dd MMM', { locale: localeId })} — {format(timeRange.end, 'dd MMM yyyy', { locale: localeId })}
-            </span>
-          </span>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-1.5 text-ink text-xs font-mono font-medium bg-paper-blue px-2 py-0.5 border border-ink">
-            <IconActivity className="w-3.5 h-3.5" />
-            <span>{filteredReports.length} Laporan</span>
-          </div>
+    <div className="flex items-center gap-2 sm:gap-3 py-1.5 px-1 select-none">
+      {/* Quick-preset chips */}
+      <div className="flex items-center gap-1 shrink-0">
+        {PRESETS.map(({ label, days }) => (
           <button
-            type="button"
-            onClick={reset}
-            className="p-1 text-ink/60 hover:text-ink hover:bg-paper-kraft border border-ink/30 transition-colors"
-            title="Reset ke 14 hari terakhir"
-          >
-            <IconRotateClockwise className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Physical Paper Track Slider */}
-      <div
-        ref={trackRef}
-        className="relative h-2 bg-[#DED6C5] border border-ink cursor-pointer mt-3"
-        onClick={(e) => {
-          const pct = getPercent(e.clientX);
-          const date = percentToDate(pct);
-          const distStart = Math.abs(pct - startPct);
-          const distEnd = Math.abs(pct - endPct);
-          if (distStart < distEnd) {
-            if (date < timeRange.end) setTimeRange(date, timeRange.end);
-          } else {
-            if (date > timeRange.start) setTimeRange(timeRange.start, date);
-          }
-        }}
-      >
-        {/* Active Range Highlight */}
-        <div
-          className="absolute top-0 h-full bg-paper-kraft border-x border-ink"
-          style={{ left: `${startPct}%`, width: `${endPct - startPct}%` }}
-        />
-
-        {/* Start Handle */}
-        <div
-          className="absolute top-1/2 w-3.5 h-5 -translate-y-1/2 -translate-x-1/2 bg-paper-white border border-ink flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-105 transition-transform"
-          style={{ left: `${startPct}%` }}
-          onMouseDown={() => { dragging.current = 'start'; }}
-          onTouchStart={() => { dragging.current = 'start'; }}
-        >
-          <div className="w-0.5 h-2.5 bg-ink" />
-        </div>
-
-        {/* End Handle */}
-        <div
-          className="absolute top-1/2 w-3.5 h-5 -translate-y-1/2 -translate-x-1/2 bg-paper-white border border-ink flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-105 transition-transform"
-          style={{ left: `${endPct}%` }}
-          onMouseDown={() => { dragging.current = 'end'; }}
-          onTouchStart={() => { dragging.current = 'end'; }}
-        >
-          <div className="w-0.5 h-2.5 bg-ink" />
-        </div>
-      </div>
-
-      {/* Preset Buttons */}
-      <div className="flex items-center gap-1.5 mt-3.5">
-        {[
-          { label: '7 Hari', days: 7 },
-          { label: '14 Hari', days: 14 },
-          { label: '30 Hari', days: 30 },
-          { label: '90 Hari', days: 90 },
-        ].map(({ label, days }) => (
-          <button
-            key={label}
+            key={days}
             type="button"
             onClick={() => setTimeRange(subDays(new Date(), days), new Date())}
-            className="px-2.5 py-0.5 text-xs font-sans border border-ink/40 bg-paper-white hover:bg-paper-kraft text-ink transition-colors"
+            className={`px-2 py-0.5 text-[10px] font-sans border transition-colors ${
+              activePresetDays === days
+                ? 'border-ink bg-ink text-paper-white font-semibold'
+                : 'border-border-paper bg-paper-white text-ink/70 hover:border-ink hover:text-ink'
+            }`}
+            style={{ borderRadius: '2px' }}
           >
             {label}
           </button>
         ))}
       </div>
+
+      {/* Compact range slider */}
+      <div className="flex-1 min-w-[80px] relative">
+        <div
+          ref={trackRef}
+          className="relative h-[6px] bg-border-paper/60 border border-border-paper cursor-pointer"
+          style={{ borderRadius: '2px' }}
+          onClick={(e) => {
+            const pct = getPercent(e.clientX);
+            const date = percentToDate(pct);
+            const distStart = Math.abs(pct - startPct);
+            const distEnd = Math.abs(pct - endPct);
+            if (distStart < distEnd) {
+              if (date < timeRange.end) setTimeRange(date, timeRange.end);
+            } else {
+              if (date > timeRange.start) setTimeRange(timeRange.start, date);
+            }
+          }}
+        >
+          {/* Active range fill */}
+          <div
+            className="absolute top-0 h-full bg-ink/25"
+            style={{ left: `${startPct}%`, width: `${endPct - startPct}%` }}
+          />
+
+          {/* Start handle */}
+          <div
+            className="absolute top-1/2 w-2.5 h-4 -translate-y-1/2 -translate-x-1/2 bg-paper-white border border-ink cursor-grab active:cursor-grabbing hover:bg-paper-kraft transition-colors"
+            style={{ left: `${startPct}%`, borderRadius: '2px' }}
+            onMouseDown={() => { dragging.current = 'start'; }}
+            onTouchStart={() => { dragging.current = 'start'; }}
+          />
+
+          {/* End handle */}
+          <div
+            className="absolute top-1/2 w-2.5 h-4 -translate-y-1/2 -translate-x-1/2 bg-paper-white border border-ink cursor-grab active:cursor-grabbing hover:bg-paper-kraft transition-colors"
+            style={{ left: `${endPct}%`, borderRadius: '2px' }}
+            onMouseDown={() => { dragging.current = 'end'; }}
+            onTouchStart={() => { dragging.current = 'end'; }}
+          />
+        </div>
+      </div>
+
+      {/* Date range label (monospace) */}
+      <span className="font-mono text-[10px] text-ink/70 whitespace-nowrap shrink-0 hidden sm:inline">
+        {format(timeRange.start, 'dd MMM', { locale: localeId })} — {format(timeRange.end, 'dd MMM', { locale: localeId })}
+      </span>
+
+      {/* Report count */}
+      <span className="font-mono text-[10px] font-semibold text-ink bg-paper-kraft/60 border border-border-paper px-1.5 py-0.5 shrink-0" style={{ borderRadius: '2px' }}>
+        {filteredReports.length}
+      </span>
+
+      {/* Reset */}
+      <button
+        type="button"
+        onClick={reset}
+        className="p-1 text-ink/50 hover:text-ink hover:bg-paper-kraft border border-border-paper transition-colors shrink-0"
+        style={{ borderRadius: '2px' }}
+        title="Reset ke 14 hari terakhir"
+      >
+        <IconRotateClockwise className="w-3 h-3" />
+      </button>
     </div>
   );
 };

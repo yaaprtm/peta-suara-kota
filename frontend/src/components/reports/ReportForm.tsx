@@ -168,7 +168,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
       }
 
       setIsRecording(true);
-      toast.success('Perekaman suara aktif. Silakan berbicara...');
+      toast.success('Rekaman aktif. Silakan berbicara, Cak/Ning…');
     } catch {
       toast.error('Tidak dapat mengakses mikrofon');
     }
@@ -179,22 +179,22 @@ const ReportForm: React.FC<ReportFormProps> = ({
       mediaRecorderRef.current.stop();
       recognitionRef.current?.stop();
       setIsRecording(false);
-      toast.success('Perekaman audio selesai');
+      toast.success('Rekaman suara wes selesai');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      toast.error('Judul perihal wajib diisi');
+      toast.error('Judul perihal wajib diisi, Cak/Ning');
       return;
     }
     if (!description.trim()) {
-      toast.error('Deskripsi kronologi wajib diisi');
+      toast.error('Deskripsi kronologi wajib diisi ya');
       return;
     }
     if (!activeLocation) {
-      toast.error('Pilih titik lokasi pada peta');
+      toast.error('Pilih titik lokasi dulu di peta');
       return;
     }
 
@@ -258,9 +258,9 @@ const ReportForm: React.FC<ReportFormProps> = ({
       }
 
       setStep('success');
-      toast.success('Laporan berhasil didaftarkan ke berkas pengaduan!');
+      toast.success('Matur nuwun, laporanmu wes masuk!');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal mengirim laporan';
+      const msg = err instanceof Error ? err.message : 'Waduh, ada yang error. Coba lagi sebentar.';
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -272,14 +272,14 @@ const ReportForm: React.FC<ReportFormProps> = ({
       <div className="bg-paper-white p-6 border border-ink flex flex-col items-center text-center space-y-4 font-body text-ink">
         <div className="border-2 border-dashed border-ink p-4 w-full flex flex-col items-center gap-2 bg-paper-kraft/40">
           <div className="official-stamp text-xs">
-            <span>TERVERIFIKASI</span>
+            <span>TERCATAT</span>
             <span className="text-[9px]">KOTA SURABAYA</span>
           </div>
           <h3 className="font-body font-bold text-base text-ink tracking-tight uppercase mt-1">
-            BERKAS PENGADUAN DITERIMA
+            MATUR NUWUN, LAPORANMU WES MASUK
           </h3>
           <p className="font-mono text-xs text-ink/70 max-w-sm">
-            Laporan Anda telah tercatat dalam arsip pengaduan kelurahan dan sistem pemantauan urgensi kota.
+            Laporanmu wes tercatat di arsip pengaduan kelurahan. Petugas bakal segera nindaklanjuti.
           </p>
         </div>
         <button
@@ -301,12 +301,12 @@ const ReportForm: React.FC<ReportFormProps> = ({
       <div className="border-b border-ink/40 pb-2 mb-3">
         <div className="flex items-center justify-between">
           <span className="font-mono text-[10px] uppercase tracking-wider text-ink/60">
-            KOTAMADYA SURABAYA · DOKUMEN PENGADUAN
+            KOTA SURABAYA · PENGADUAN WARGA
           </span>
           <span className="font-mono text-[10px] text-ink/60">BLANGKO RESMI</span>
         </div>
         <h2 className="font-body font-bold text-sm text-ink tracking-tight mt-0.5 uppercase">
-          FORMULIR LAPORAN ASPIRASI & GANGGUAN WARGA
+          FORMULIR LAPORAN WARGA SURABAYA
         </h2>
       </div>
 
@@ -347,7 +347,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Contoh: Aspal Amblas Depan Kantor Kelurahan..."
+          placeholder="Contoh: Aspal amblas depan kantor kelurahan…"
           className="input-paper text-xs"
         />
       </div>
@@ -406,7 +406,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Tuliskan uraian jelas mengenai kejadian atau kondisi lapangan..."
+          placeholder="Ceritakan kronologi masalahnya, Cak/Ning…"
           rows={3}
           className="input-paper text-xs resize-none"
         />
@@ -421,7 +421,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="Contoh: Jl. Embong Malang No. 10, RT 02 / RW 01..."
+          placeholder="Contoh: Jl. Embong Malang No. 10, RT 02/RW 01…"
           className="input-paper text-xs"
         />
       </div>
@@ -442,8 +442,8 @@ const ReportForm: React.FC<ReportFormProps> = ({
         >
           <input {...getInputProps()} />
           <IconUpload className="w-4 h-4 mx-auto text-ink/60 mb-1" stroke={1.5} />
-          <p className="text-ink/70 text-[11px]">
-            {isDragActive ? 'Lepaskan berkas foto di sini' : 'Klik atau seret foto bukti laporan ke area ini'}
+          <p className="text-ink/60 text-[11px] font-sans">
+            {isDragActive ? 'Lepaskan berkas foto di sini' : 'Klik atau seret foto bukti ke sini'}
           </p>
         </div>
         {photos.length > 0 && (
@@ -475,12 +475,12 @@ const ReportForm: React.FC<ReportFormProps> = ({
           {isSubmitting ? (
             <>
               <IconLoader2 className="w-4 h-4 animate-spin" stroke={1.5} />
-              <span>MENDAFTARKAN BERKAS...</span>
+              <span>MENGIRIM LAPORAN…</span>
             </>
           ) : (
             <>
               <IconSend className="w-4 h-4" stroke={1.5} />
-              <span>KIRIMKAN LAPORAN RESMI</span>
+              <span>KIRIM LAPORAN</span>
             </>
           )}
         </button>
