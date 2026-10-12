@@ -235,3 +235,103 @@ body {
 .mapboxgl-ctrl-attrib a {
   color: rgba(43, 40, 34, 0.6) !important;
 }
+
+/* ─── Peta Suara Kota Custom Pin System ───────────────────────────────────── */
+
+.psk-pin-wrapper {
+  position: relative;
+  cursor: pointer;
+  transition: z-index 0s;
+}
+
+.psk-pin-wrapper:hover,
+.psk-pin-wrapper:focus-within {
+  z-index: 1000 !important;
+}
+
+.psk-pin-inner {
+  display: block;
+  outline: none;
+  transition: transform 150ms ease;
+  user-select: none;
+}
+
+.psk-pin-inner.anchor-bottom {
+  transform-origin: center bottom;
+}
+
+.psk-pin-inner.anchor-center {
+  transform-origin: center center;
+}
+
+.psk-pin-inner:hover,
+.psk-pin-inner:focus-visible {
+  transform: translateY(-3px) scale(1.1);
+}
+
+.psk-pin-inner:focus-visible {
+  filter: drop-shadow(0 0 2px #FAF6EE);
+}
+
+/* Keyframe Animasi Denyut (Scale + Fade, 2s, Infinite) */
+@keyframes pin-pulse-scale {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.25;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+}
+
+.pin-pulse-ring {
+  transform-origin: 40px 40px;
+  animation: pin-pulse-scale 2s infinite ease-in-out;
+}
+
+.pin-pulse-inner {
+  transform-origin: 40px 40px;
+  animation: pin-pulse-scale 2s infinite ease-in-out 0.3s;
+}
+
+/* Radar Denyut untuk Default Kritis */
+@keyframes pin-radar-expand {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+}
+
+.pin-radar-ring {
+  transform-origin: 34px 27px;
+  animation: pin-radar-expand 2s infinite ease-in-out;
+}
+
+.pin-radar-ring-outer {
+  transform-origin: 34px 27px;
+  animation: pin-radar-expand 2s infinite ease-in-out 0.5s;
+}
+
+/* Menghormati prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .pin-pulse-ring,
+  .pin-pulse-inner,
+  .pin-radar-ring,
+  .pin-radar-ring-outer {
+    animation: none !important;
+  }
+}
+

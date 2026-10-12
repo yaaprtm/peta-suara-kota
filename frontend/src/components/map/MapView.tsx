@@ -9,6 +9,7 @@ import {
 } from '@tabler/icons-react';
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
+import { createPinElement, PIN_STYLE } from './markers/createPin';
 
 // ─── Mapbox Access Token Setup & Validation ───────────────────────────────────
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -35,56 +36,6 @@ const SURABAYA_BOUNDS: [[number, number], [number, number]] = [
   [112.55, -7.38], // Barat Daya (Southwest Surabaya)
   [112.92, -7.15], // Timur Laut (Northeast Surabaya)
 ];
-
-// Helper: Buat gambar teardrop pin canvas untuk Mapbox image
-function createTeardropImageData(
-  color: string,
-  width = 24,
-  height = 32,
-  isSatellite = false
-) {
-  const canvas = document.createElement('canvas');
-  canvas.width = width * 2;
-  canvas.height = height * 2;
-  const ctx = canvas.getContext('2d')!;
-  ctx.scale(2, 2);
-
-  const r = width / 2 - 2;
-  const cx = width / 2;
-  const cy = r + 2;
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, Math.PI * 0.8, Math.PI * 0.2, false);
-  ctx.lineTo(cx, height - 2);
-  ctx.closePath();
-
-  ctx.fillStyle = color;
-  ctx.fill();
-
-  if (isSatellite) {
-    // Mode satelit: outline putih/krem (#FAF6EE) selebar 2px agar kontras di atas citra satelit
-    ctx.strokeStyle = '#FAF6EE';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  } else {
-    // Mode peta gelap: outline asli #2B2822 selebar 1.8px (tidak diubah)
-    ctx.strokeStyle = '#2B2822';
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-  }
-
-  // Inner center dot
-  ctx.beginPath();
-  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-  ctx.fillStyle = '#FAF6EE';
-  ctx.fill();
-
-  return {
-    width: width * 2,
-    height: height * 2,
-    data: ctx.getImageData(0, 0, width * 2, height * 2).data,
-  };
-}
 
 // Helper: Convert array Report ke GeoJSON FeatureCollection
 function reportsToGeoJSON(reports: Report[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
@@ -167,6 +118,9 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
 
   const isInitialLoadRef = useRef(true);
 
+  // Kumpulan Mapbox Marker HTML yang aktif di viewport
+  const markersOnScreenRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+
   // Validasi jika token kosong
   if (!MAPBOX_TOKEN) {
     return (
@@ -203,6 +157,73 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       fetchViewportReports(bbox, zoom);
     }, 300)
   ).current;
+
+  // ─── Pembaruan DOM Markers untuk Titik Tidak Ter-Cluster ────────────────────
+  const updateCustomMarkers = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    if (!map.getLayer('unclustered-point')) return;
+
+    // Map id -> Report untuk pencarian O(1)
+    const reportMap = new Map<string, Report>();
+    for (const r of filteredReportsRef.current) {
+      reportMap.set(r.id, r);
+    }
+
+    let features: mapboxgl.MapboxGeoJSONFeature[] = [];
+    try {
+      features = map.queryRenderedFeatures({ layers: ['unclustered-point'] });
+    } catch {
+      return;
+    }
+
+    const currentMarkers = markersOnScreenRef.current;
+    const newVisibleIds = new Set<string>();
+
+    for (const f of features) {
+      const id = f.properties?.id;
+      if (!id || newVisibleIds.has(id)) continue;
+      newVisibleIds.add(id);
+
+      // Pasang marker baru jika belum ada di layar
+      if (!currentMarkers.has(id)) {
+        const report = reportMap.get(id);
+        if (report) {
+          const { element, anchor } = createPinElement(report, PIN_STYLE);
+
+          element.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onSelectReportRef.current(report);
+          });
+
+          element.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              onSelectReportRef.current(report);
+            }
+          });
+
+          const marker = new mapboxgl.Marker({ element, anchor })
+            .setLngLat([report.longitude, report.latitude])
+            .addTo(map);
+
+          currentMarkers.set(id, marker);
+        }
+      }
+
+      // Batasi maksimal 300 marker DOM demi performa
+      if (newVisibleIds.size >= 300) break;
+    }
+
+    // Hapus marker yang keluar viewport atau melebur ke dalam cluster
+    for (const [id, marker] of currentMarkers.entries()) {
+      if (!newVisibleIds.has(id)) {
+        marker.remove();
+        currentMarkers.delete(id);
+      }
+    }
+  }, []);
 
   // ─── Event Handlers untuk Layer Peta ─────────────────────────────────────────
 
@@ -274,23 +295,7 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
   const addReportLayers = useCallback((map: mapboxgl.Map) => {
     const isSatellite = mapStyleRef.current === 'satelit';
 
-    // 1. Daftarkan custom teardrop pin icons sesuai mode (satelit vs peta gelap)
-    const pinKritis = createTeardropImageData('#B23327', 28, 36, isSatellite);
-    const pinTinggi = createTeardropImageData('#C9972F', 24, 32, isSatellite);
-    const pinSedang = createTeardropImageData('#C9972F', 22, 30, isSatellite);
-    const pinRendah = createTeardropImageData('#4A7A6E', 20, 26, isSatellite);
-
-    if (map.hasImage('pin-kritis')) map.removeImage('pin-kritis');
-    if (map.hasImage('pin-tinggi')) map.removeImage('pin-tinggi');
-    if (map.hasImage('pin-sedang')) map.removeImage('pin-sedang');
-    if (map.hasImage('pin-rendah')) map.removeImage('pin-rendah');
-
-    map.addImage('pin-kritis', pinKritis);
-    map.addImage('pin-tinggi', pinTinggi);
-    map.addImage('pin-sedang', pinSedang);
-    map.addImage('pin-rendah', pinRendah);
-
-    // 2. Tambahkan GeoJSON Source laporan (menggunakan data yang sudah ada di store)
+    // 1. Tambahkan GeoJSON Source laporan (menggunakan data yang sudah ada di store)
     if (!map.getSource('reports-source')) {
       map.addSource('reports-source', {
         type: 'geojson',
@@ -305,8 +310,7 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       );
     }
 
-    // 3. Layer Cluster Circles (Paper Board Stamp Bubble)
-    // Di mode satelit diberi stroke putih/krem (#FAF6EE) 2px agar kontras
+    // 2. Layer Cluster Circles (Paper Board Stamp Bubble — tidak diubah)
     if (!map.getLayer('clusters')) {
       map.addLayer({
         id: 'clusters',
@@ -339,7 +343,7 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       });
     }
 
-    // 4. Layer Cluster Count Label
+    // 3. Layer Cluster Count Label (tidak diubah)
     if (!map.getLayer('cluster-count')) {
       map.addLayer({
         id: 'cluster-count',
@@ -357,28 +361,23 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       });
     }
 
-    // 5. Layer Unclustered Points (Teardrop Pins sesuai urgensi)
+    // 4. Layer Unclustered Points (Transparan — dipakai untuk query titik unclustered)
     if (!map.getLayer('unclustered-point')) {
       map.addLayer({
         id: 'unclustered-point',
-        type: 'symbol',
+        type: 'circle',
         source: 'reports-source',
         filter: ['!', ['has', 'point_count']],
-        layout: {
-          'icon-image': ['get', 'pinType'],
-          'icon-size': 0.55,
-          'icon-anchor': 'bottom',
-          'icon-allow-overlap': true,
+        paint: {
+          'circle-radius': 1,
+          'circle-opacity': 0,
         },
       });
     }
 
-    // 6. Pasang event listener layer (lepaskan dulu agar tidak menumpuk ganda)
+    // 5. Pasang event listener layer cluster
     map.off('click', 'clusters', handleClusterClick);
     map.on('click', 'clusters', handleClusterClick);
-
-    map.off('click', 'unclustered-point', handlePointClick);
-    map.on('click', 'unclustered-point', handlePointClick);
 
     map.off('mouseenter', 'clusters', handleMouseEnter);
     map.on('mouseenter', 'clusters', handleMouseEnter);
@@ -386,12 +385,11 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
     map.off('mouseleave', 'clusters', handleMouseLeave);
     map.on('mouseleave', 'clusters', handleMouseLeave);
 
-    map.off('mouseenter', 'unclustered-point', handleMouseEnter);
-    map.on('mouseenter', 'unclustered-point', handleMouseEnter);
-
-    map.off('mouseleave', 'unclustered-point', handleMouseLeave);
-    map.on('mouseleave', 'unclustered-point', handleMouseLeave);
-  }, [handleClusterClick, handlePointClick, handleMouseEnter, handleMouseLeave]);
+    // Refresh marker kustom di viewport
+    markersOnScreenRef.current.forEach((m) => m.remove());
+    markersOnScreenRef.current.clear();
+    updateCustomMarkers();
+  }, [handleClusterClick, handleMouseEnter, handleMouseLeave, updateCustomMarkers]);
 
   // ─── Initialize Mapbox GL Map ───────────────────────────────────────────────
 
@@ -427,6 +425,16 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
     // Event listener pergerakan / zoom peta
     map.on('moveend', () => {
       debouncedFetchReports(map);
+      updateCustomMarkers();
+    });
+
+    map.on('zoomend', updateCustomMarkers);
+    map.on('idle', updateCustomMarkers);
+
+    map.on('sourcedata', (e) => {
+      if (e.sourceId === 'reports-source' && e.isSourceLoaded) {
+        updateCustomMarkers();
+      }
     });
 
     // Click handler untuk pilih lokasi (jika mode picking location aktif)
@@ -437,13 +445,16 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
     mapRef.current = map;
 
     return () => {
+      markersOnScreenRef.current.forEach((m) => m.remove());
+      markersOnScreenRef.current.clear();
       map.remove();
       mapRef.current = null;
     };
-  }, [debouncedFetchReports, addReportLayers]);
+  }, [debouncedFetchReports, addReportLayers, updateCustomMarkers]);
 
   // ─── Update GeoJSON Data saat filteredReports berubah ───────────────────────
   useEffect(() => {
+    filteredReportsRef.current = filteredReports;
     if (!mapRef.current) return;
     const map = mapRef.current;
     if (!map.isStyleLoaded()) return;
@@ -452,7 +463,12 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
     if (source) {
       source.setData(reportsToGeoJSON(filteredReports));
     }
-  }, [filteredReports]);
+
+    // Bersihkan marker lama dan render ulang sesuai laporan yang lolos filter
+    markersOnScreenRef.current.forEach((m) => m.remove());
+    markersOnScreenRef.current.clear();
+    updateCustomMarkers();
+  }, [filteredReports, updateCustomMarkers]);
 
   // ─── Fly to Selected Report ───────────────────────────────────────────────
   useEffect(() => {

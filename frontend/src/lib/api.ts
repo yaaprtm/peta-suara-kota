@@ -1,4 +1,5 @@
-const BASE_URL = '/api';
+const API_HOST = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const BASE_URL = API_HOST ? `${API_HOST}/api` : '/api';
 
 // ─── HTTP helpers ──────────────────────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ export function createSSEConnection(
   onStatusUpdate: (data: { reportId: string; newStatus: string }) => void
 ): EventSource {
   const token = localStorage.getItem('accessToken');
-  const url = `/api/reports/stream${token ? `?token=${token}` : ''}`;
+  const url = `${API_HOST}/api/reports/stream${token ? `?token=${token}` : ''}`;
   const es = new EventSource(url);
 
   es.addEventListener('new_report', e => {

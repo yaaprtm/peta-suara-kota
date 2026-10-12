@@ -7,9 +7,10 @@
     "backend"
   ],
   "scripts": {
+    "build": "npm run build --workspace=frontend",
+    "build:all": "npm run build --workspace=frontend && npm run build --workspace=backend",
     "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
     "install:all": "npm install",
-    "build:all": "npm run build --workspace=frontend && npm run build --workspace=backend",
     "prisma:generate": "npm run prisma:generate --workspace=backend",
     "prisma:migrate": "npm run prisma:migrate --workspace=backend",
     "prisma:seed": "npm run prisma:seed --workspace=backend"
