@@ -1,7 +1,12 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { IconAlertTriangle, IconKey } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconKey,
+  IconMap2,
+  IconSatellite,
+} from '@tabler/icons-react';
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
 
@@ -10,6 +15,14 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 if (MAPBOX_TOKEN) {
   mapboxgl.accessToken = MAPBOX_TOKEN;
 }
+
+// ─── Style Peta (Peta Gelap & Satelit) ─────────────────────────────────────────
+export type MapStyleMode = 'peta' | 'satelit';
+
+const MAP_STYLES: Record<MapStyleMode, string> = {
+  peta: 'mapbox://styles/mapbox/dark-v11',
+  satelit: 'mapbox://styles/mapbox/satellite-streets-v12',
+};
 
 // ─── Default View & Batasan Wilayah Surabaya ──────────────────────────────────
 const SURABAYA_CENTER: [number, number] = [112.7521, -7.2575]; // Titik tengah Surabaya
@@ -24,7 +37,12 @@ const SURABAYA_BOUNDS: [[number, number], [number, number]] = [
 ];
 
 // Helper: Buat gambar teardrop pin canvas untuk Mapbox image
-function createTeardropImageData(color: string, width = 24, height = 32) {
+function createTeardropImageData(
+  color: string,
+  width = 24,
+  height = 32,
+  isSatellite = false
+) {
   const canvas = document.createElement('canvas');
   canvas.width = width * 2;
   canvas.height = height * 2;
@@ -43,9 +61,17 @@ function createTeardropImageData(color: string, width = 24, height = 32) {
   ctx.fillStyle = color;
   ctx.fill();
 
-  ctx.strokeStyle = '#2B2822';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
+  if (isSatellite) {
+    // Mode satelit: outline putih/krem (#FAF6EE) selebar 2px agar kontras di atas citra satelit
+    ctx.strokeStyle = '#FAF6EE';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  } else {
+    // Mode peta gelap: outline asli #2B2822 selebar 1.8px (tidak diubah)
+    ctx.strokeStyle = '#2B2822';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+  }
 
   // Inner center dot
   ctx.beginPath();
@@ -122,7 +148,24 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const crosshairRef = useRef<HTMLDivElement>(null);
 
+  // State pilihan style peta (default: 'peta')
+  const [mapStyle, setMapStyle] = useState<MapStyleMode>('peta');
+  const mapStyleRef = useRef<MapStyleMode>(mapStyle);
+  mapStyleRef.current = mapStyle;
+
   const { filteredReports, selectedReport, fetchViewportReports } = useReportsStore();
+
+  // Simpan data & props ke ref agar listener stabil dan tidak men-trigger re-attach yang tak perlu
+  const filteredReportsRef = useRef(filteredReports);
+  filteredReportsRef.current = filteredReports;
+
+  const onSelectReportRef = useRef(onSelectReport);
+  onSelectReportRef.current = onSelectReport;
+
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
+
+  const isInitialLoadRef = useRef(true);
 
   // Validasi jika token kosong
   if (!MAPBOX_TOKEN) {
@@ -161,45 +204,110 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
     }, 300)
   ).current;
 
-  // ─── Initialize Mapbox GL Map ───────────────────────────────────────────────
+  // ─── Event Handlers untuk Layer Peta ─────────────────────────────────────────
 
-  useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
-
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: SURABAYA_CENTER,
-      zoom: DEFAULT_ZOOM,
-      minZoom: MIN_ZOOM,
-      maxZoom: MAX_ZOOM,
-      maxBounds: SURABAYA_BOUNDS,
+  const handleClusterClick = useCallback((e: mapboxgl.MapLayerMouseEvent) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const features = map.queryRenderedFeatures(e.point, {
+      layers: ['clusters'],
     });
+    if (!features.length) return;
+    const clusterId = features[0].properties?.cluster_id;
+    const source = map.getSource('reports-source') as mapboxgl.GeoJSONSource | undefined;
+    if (!source) return;
 
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+    source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+      if (err || zoom === undefined || zoom === null) return;
+      const coords = (features[0].geometry as GeoJSON.Point).coordinates;
+      map.easeTo({
+        center: [coords[0], coords[1]],
+        zoom: zoom,
+        duration: 600,
+      });
+    });
+  }, []);
 
-    map.on('load', () => {
-      // Register custom teardrop pin marker icons for each urgency level
-      const pinKritis = createTeardropImageData('#B23327', 28, 36);
-      const pinTinggi = createTeardropImageData('#C9972F', 24, 32);
-      const pinSedang = createTeardropImageData('#C9972F', 22, 30);
-      const pinRendah = createTeardropImageData('#4A7A6E', 20, 26);
+  const handlePointClick = useCallback((e: mapboxgl.MapLayerMouseEvent) => {
+    if (!e.features || !e.features[0]) return;
+    const props = e.features[0].properties as any;
+    if (!props) return;
 
-      map.addImage('pin-kritis', pinKritis);
-      map.addImage('pin-tinggi', pinTinggi);
-      map.addImage('pin-sedang', pinSedang);
-      map.addImage('pin-rendah', pinRendah);
+    try {
+      const report: Report = {
+        id: props.id,
+        title: props.title,
+        description: props.description,
+        category: props.category,
+        status: props.status,
+        skorUrgensi: Number(props.skorUrgensi),
+        latitude: (e.features[0].geometry as GeoJSON.Point).coordinates[1],
+        longitude: (e.features[0].geometry as GeoJSON.Point).coordinates[0],
+        address: props.address,
+        photos: props.photos ? JSON.parse(props.photos) : [],
+        urgensiKeywords: props.urgensiKeywords ? JSON.parse(props.urgensiKeywords) : [],
+        userId: props.userId || '',
+        createdAt: props.createdAt,
+        updatedAt: props.updatedAt || props.createdAt,
+        user: props.user ? JSON.parse(props.user) : { id: '', name: 'Warga' },
+        kelurahan: props.kelurahan ? JSON.parse(props.kelurahan) : undefined,
+      };
+      onSelectReportRef.current(report);
+    } catch (err) {
+      console.error('Failed to parse report properties', err);
+    }
+  }, []);
 
-      // 1. Tambahkan GeoJSON Source dengan Native Mapbox Clustering
+  const handleMouseEnter = useCallback(() => {
+    if (mapRef.current) {
+      mapRef.current.getCanvas().style.cursor = 'pointer';
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (mapRef.current) {
+      mapRef.current.getCanvas().style.cursor = '';
+    }
+  }, []);
+
+  // ─── SATU Fungsi Penambahan Source & Layer Laporan ──────────────────────────
+  const addReportLayers = useCallback((map: mapboxgl.Map) => {
+    const isSatellite = mapStyleRef.current === 'satelit';
+
+    // 1. Daftarkan custom teardrop pin icons sesuai mode (satelit vs peta gelap)
+    const pinKritis = createTeardropImageData('#B23327', 28, 36, isSatellite);
+    const pinTinggi = createTeardropImageData('#C9972F', 24, 32, isSatellite);
+    const pinSedang = createTeardropImageData('#C9972F', 22, 30, isSatellite);
+    const pinRendah = createTeardropImageData('#4A7A6E', 20, 26, isSatellite);
+
+    if (map.hasImage('pin-kritis')) map.removeImage('pin-kritis');
+    if (map.hasImage('pin-tinggi')) map.removeImage('pin-tinggi');
+    if (map.hasImage('pin-sedang')) map.removeImage('pin-sedang');
+    if (map.hasImage('pin-rendah')) map.removeImage('pin-rendah');
+
+    map.addImage('pin-kritis', pinKritis);
+    map.addImage('pin-tinggi', pinTinggi);
+    map.addImage('pin-sedang', pinSedang);
+    map.addImage('pin-rendah', pinRendah);
+
+    // 2. Tambahkan GeoJSON Source laporan (menggunakan data yang sudah ada di store)
+    if (!map.getSource('reports-source')) {
       map.addSource('reports-source', {
         type: 'geojson',
-        data: reportsToGeoJSON(filteredReports),
+        data: reportsToGeoJSON(filteredReportsRef.current),
         cluster: true,
         clusterMaxZoom: 14,
         clusterRadius: 40,
       });
+    } else {
+      (map.getSource('reports-source') as mapboxgl.GeoJSONSource).setData(
+        reportsToGeoJSON(filteredReportsRef.current)
+      );
+    }
 
-      // 2. Layer Cluster Circles (Paper Board Stamp Bubble)
+    // 3. Layer Cluster Circles (Paper Board Stamp Bubble)
+    // Di mode satelit diberi stroke putih/krem (#FAF6EE) 2px agar kontras
+    if (!map.getLayer('clusters')) {
       map.addLayer({
         id: 'clusters',
         type: 'circle',
@@ -225,12 +333,14 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
             28,
           ],
           'circle-stroke-width': 2,
-          'circle-stroke-color': '#2B2822',
+          'circle-stroke-color': isSatellite ? '#FAF6EE' : '#2B2822',
           'circle-opacity': 0.95,
         },
       });
+    }
 
-      // 3. Layer Cluster Count Label
+    // 4. Layer Cluster Count Label
+    if (!map.getLayer('cluster-count')) {
       map.addLayer({
         id: 'cluster-count',
         type: 'symbol',
@@ -245,8 +355,10 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
           'text-color': '#2B2822',
         },
       });
+    }
 
-      // 4. Layer Unclustered Points (Teardrop Pins based on urgency)
+    // 5. Layer Unclustered Points (Teardrop Pins sesuai urgensi)
+    if (!map.getLayer('unclustered-point')) {
       map.addLayer({
         id: 'unclustered-point',
         type: 'symbol',
@@ -259,84 +371,67 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
           'icon-allow-overlap': true,
         },
       });
+    }
 
-      // ─── Interaksi Klik Cluster ───────────────────────────────────────────
-      map.on('click', 'clusters', (e) => {
-        const features = map.queryRenderedFeatures(e.point, {
-          layers: ['clusters'],
-        });
-        if (!features.length) return;
-        const clusterId = features[0].properties?.cluster_id;
-        const source = map.getSource('reports-source') as mapboxgl.GeoJSONSource;
+    // 6. Pasang event listener layer (lepaskan dulu agar tidak menumpuk ganda)
+    map.off('click', 'clusters', handleClusterClick);
+    map.on('click', 'clusters', handleClusterClick);
 
-        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err || zoom === undefined || zoom === null) return;
-          const coords = (features[0].geometry as GeoJSON.Point).coordinates;
-          map.easeTo({
-            center: [coords[0], coords[1]],
-            zoom: zoom,
-            duration: 600,
-          });
-        });
-      });
+    map.off('click', 'unclustered-point', handlePointClick);
+    map.on('click', 'unclustered-point', handlePointClick);
 
-      // ─── Interaksi Klik Titik Individual ──────────────────────────────────
-      map.on('click', 'unclustered-point', (e) => {
-        if (!e.features || !e.features[0]) return;
-        const props = e.features[0].properties as any;
-        if (!props) return;
+    map.off('mouseenter', 'clusters', handleMouseEnter);
+    map.on('mouseenter', 'clusters', handleMouseEnter);
 
-        try {
-          const report: Report = {
-            id: props.id,
-            title: props.title,
-            description: props.description,
-            category: props.category,
-            status: props.status,
-            skorUrgensi: Number(props.skorUrgensi),
-            latitude: (e.features[0].geometry as GeoJSON.Point).coordinates[1],
-            longitude: (e.features[0].geometry as GeoJSON.Point).coordinates[0],
-            address: props.address,
-            photos: props.photos ? JSON.parse(props.photos) : [],
-            urgensiKeywords: props.urgensiKeywords ? JSON.parse(props.urgensiKeywords) : [],
-            userId: props.userId || '',
-            createdAt: props.createdAt,
-            updatedAt: props.updatedAt || props.createdAt,
-            user: props.user ? JSON.parse(props.user) : { id: '', name: 'Warga' },
-            kelurahan: props.kelurahan ? JSON.parse(props.kelurahan) : undefined,
-          };
-          onSelectReport(report);
-        } catch (err) {
-          console.error('Failed to parse report properties', err);
-        }
-      });
+    map.off('mouseleave', 'clusters', handleMouseLeave);
+    map.on('mouseleave', 'clusters', handleMouseLeave);
 
-      // ─── Ubah Kursor saat Hover ───────────────────────────────────────────
-      map.on('mouseenter', 'clusters', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'clusters', () => {
-        map.getCanvas().style.cursor = '';
-      });
-      map.on('mouseenter', 'unclustered-point', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'unclustered-point', () => {
-        map.getCanvas().style.cursor = '';
-      });
+    map.off('mouseenter', 'unclustered-point', handleMouseEnter);
+    map.on('mouseenter', 'unclustered-point', handleMouseEnter);
 
-      // Trigger pemuatan awal data sesuai viewport awal
-      debouncedFetchReports(map);
+    map.off('mouseleave', 'unclustered-point', handleMouseLeave);
+    map.on('mouseleave', 'unclustered-point', handleMouseLeave);
+  }, [handleClusterClick, handlePointClick, handleMouseEnter, handleMouseLeave]);
+
+  // ─── Initialize Mapbox GL Map ───────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: MAP_STYLES.peta,
+      center: SURABAYA_CENTER,
+      zoom: DEFAULT_ZOOM,
+      minZoom: MIN_ZOOM,
+      maxZoom: MAX_ZOOM,
+      maxBounds: SURABAYA_BOUNDS,
     });
 
-    // ─── Event Listener Pergerakan / Zoom Peta ───────────────────────────────
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+
+    // Dipanggil pada event 'style.load' (bukan 'load') agar dijalankan ulang setiap kali style berganti
+    const handleStyleLoad = () => {
+      addReportLayers(map);
+
+      // Hanya fetch data awal saat peta pertama kali diinisialisasi
+      // Saat pergantian style, data TIDAK di-fetch ulang dari server
+      if (isInitialLoadRef.current) {
+        debouncedFetchReports(map);
+        isInitialLoadRef.current = false;
+      }
+    };
+
+    map.on('style.load', handleStyleLoad);
+
+    // Event listener pergerakan / zoom peta
     map.on('moveend', () => {
       debouncedFetchReports(map);
     });
 
     // Click handler untuk pilih lokasi (jika mode picking location aktif)
     map.on('click', (e) => {
-      onMapClick({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      onMapClickRef.current({ lat: e.lngLat.lat, lng: e.lngLat.lng });
     });
 
     mapRef.current = map;
@@ -345,7 +440,7 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       map.remove();
       mapRef.current = null;
     };
-  }, [onMapClick, onSelectReport, debouncedFetchReports]);
+  }, [debouncedFetchReports, addReportLayers]);
 
   // ─── Update GeoJSON Data saat filteredReports berubah ───────────────────────
   useEffect(() => {
@@ -381,9 +476,42 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
     }
   }, [isPickingLocation]);
 
+  // ─── Handler Pergantian Tampilan Peta ────────────────────────────────────────
+  const handleToggleStyle = useCallback(() => {
+    const nextStyle: MapStyleMode = mapStyle === 'peta' ? 'satelit' : 'peta';
+    setMapStyle(nextStyle);
+    mapStyleRef.current = nextStyle;
+
+    if (mapRef.current) {
+      // map.setStyle mempertahankan posisi kamera (center, zoom, pitch, bearing)
+      mapRef.current.setStyle(MAP_STYLES[nextStyle]);
+    }
+  }, [mapStyle]);
+
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainerRef} className="w-full h-full" />
+
+      {/* ─── Tombol Ganti Tampilan Peta (Peta / Satelit) ────────────────────── */}
+      <button
+        type="button"
+        onClick={handleToggleStyle}
+        className="absolute bottom-3 left-3 z-[10] inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-paper-white text-ink border border-ink text-xs font-sans font-medium hover:bg-paper-kraft active:translate-y-[1px] transition-colors select-none"
+        title={mapStyle === 'peta' ? 'Ganti ke tampilan Satelit' : 'Ganti ke tampilan Peta'}
+      >
+        {mapStyle === 'peta' ? (
+          <>
+            <IconSatellite className="w-3.5 h-3.5 shrink-0" stroke={1.5} />
+            <span>Satelit</span>
+          </>
+        ) : (
+          <>
+            <IconMap2 className="w-3.5 h-3.5 shrink-0" stroke={1.5} />
+            <span>Peta</span>
+          </>
+        )}
+      </button>
+
       {isPickingLocation && (
         <div
           ref={crosshairRef}
