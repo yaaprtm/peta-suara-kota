@@ -33,7 +33,10 @@ function applyFilters(reports: Report[], filter: MapFilter, timeRange: { start: 
     if (isBefore(date, timeRange.start) || isAfter(date, timeRange.end)) return false;
     if (filter.category && r.category !== filter.category) return false;
     if (filter.status && r.status !== filter.status) return false;
-    if (filter.kecamatan && r.kelurahan?.kecamatan !== filter.kecamatan) return false;
+    if (filter.kecamatan) {
+      const reportKec = r.kecamatan || r.kelurahan?.kecamatan;
+      if (!reportKec || reportKec.toLowerCase() !== filter.kecamatan.toLowerCase()) return false;
+    }
     if (filter.minScore !== undefined && r.skorUrgensi < filter.minScore) return false;
     if (filter.maxScore !== undefined && r.skorUrgensi > filter.maxScore) return false;
     return true;

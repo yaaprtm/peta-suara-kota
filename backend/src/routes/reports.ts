@@ -8,6 +8,7 @@ import { upload } from '../services/fileUpload';
 import { sseService } from '../services/sse';
 import { ReportCategory, ReportStatus, UserRole } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { determineKecamatan } from '../lib/kecamatan';
 
 export const reportsRouter = Router();
 
@@ -83,7 +84,10 @@ reportsRouter.get(
       if (category) where.category = category;
       if (status) where.status = status;
       if (kecamatan) {
-        where.kelurahan = { kecamatan };
+        where.OR = [
+          { kecamatan: { equals: kecamatan, mode: 'insensitive' } },
+          { kelurahan: { kecamatan: { equals: kecamatan, mode: 'insensitive' } } },
+        ];
       }
 
       const takeLimit = Math.min(parseInt(String(limit), 10) || 300, 500);
@@ -149,7 +153,10 @@ reportsRouter.get(
       if (status) where.status = status;
       if (kelurahanId) where.kelurahanId = kelurahanId;
       if (kecamatan) {
-        where.kelurahan = { kecamatan };
+        where.OR = [
+          { kecamatan: { equals: kecamatan, mode: 'insensitive' } },
+          { kelurahan: { kecamatan: { equals: kecamatan, mode: 'insensitive' } } },
+        ];
       }
 
       if (minScore || maxScore) {
@@ -240,13 +247,9 @@ reportsRouter.post(
       const lat = parseFloat(latitude);
       const lng = parseFloat(longitude);
 
-      // Validasi Bounding Box Surabaya: tolak laporan yang berada di luar wilayah Surabaya
-      if (
-        lat < SURABAYA_BOUNDS.minLat ||
-        lat > SURABAYA_BOUNDS.maxLat ||
-        lng < SURABAYA_BOUNDS.minLng ||
-        lng > SURABAYA_BOUNDS.maxLng
-      ) {
+      // Validasi Geografis Wilayah Surabaya dengan Point-in-Polygon poligon resmi
+      const detectedKecamatan = determineKecamatan(lng, lat);
+      if (!detectedKecamatan) {
         return next(
           new AppError(
             'Koordinat lokasi laporan berada di luar cakupan wilayah Surabaya. Silakan pilih titik lokasi di dalam area Surabaya.',
@@ -275,10 +278,11 @@ reportsRouter.post(
           title,
           description,
           category: category as ReportCategory,
-          latitude: parseFloat(latitude),
-          longitude: parseFloat(longitude),
+          latitude: lat,
+          longitude: lng,
           address: address || null,
           kelurahanId: kelurahanId || null,
+          kecamatan: detectedKecamatan,
           photos,
           audioUrl: audioUrl || null,
           audioTranscript: audioTranscript || null,

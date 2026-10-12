@@ -108,6 +108,7 @@ model Report {
   longitude       Float
   address         String?
   kelurahanId     String?
+  kecamatan       String?
   
   // Urgency scoring
   skorUrgensi     Int            @default(0)  // 0-100

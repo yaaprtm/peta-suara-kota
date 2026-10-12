@@ -18,10 +18,7 @@ import clsx from 'clsx';
 const CATEGORIES = Object.values(ReportCategory) as ReportCategory[];
 const STATUSES = Object.values(ReportStatus) as ReportStatus[];
 
-const KECAMATAN_SURABAYA = [
-  'Genteng', 'Tegalsari', 'Gubeng', 'Rungkut', 'Wonokromo',
-  'Tambaksari', 'Sawahan', 'Sukolilo',
-];
+import { KECAMATAN_SURABAYA } from '../../lib/kecamatan';
 
 // Ikon sesuai makna — BUKAN asal pilih secara visual
 const CATEGORY_ICON_MAP: Record<ReportCategory, React.ReactNode> = {

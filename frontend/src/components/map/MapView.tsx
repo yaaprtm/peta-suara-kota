@@ -10,6 +10,7 @@ import {
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
 import { createPinElement, PIN_STYLE } from './markers/createPin';
+import { fetchKecamatanGeoJSON, getKecamatanBounds } from '../../lib/kecamatan';
 
 // ─── Mapbox Access Token Setup & Validation ───────────────────────────────────
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -104,7 +105,10 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
   const mapStyleRef = useRef<MapStyleMode>(mapStyle);
   mapStyleRef.current = mapStyle;
 
-  const { filteredReports, selectedReport, fetchViewportReports } = useReportsStore();
+  const { filteredReports, selectedReport, filter, fetchViewportReports } = useReportsStore();
+
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
 
   // Simpan data & props ke ref agar listener stabil dan tidak men-trigger re-attach yang tak perlu
   const filteredReportsRef = useRef(filteredReports);
@@ -291,6 +295,57 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
     }
   }, []);
 
+  // ─── Layer Batas Kecamatan (GeoJSON Resmi Pemkot Surabaya) ───────────────────
+  const addKecamatanLayers = useCallback((map: mapboxgl.Map) => {
+    const isSatellite = mapStyleRef.current === 'satelit';
+    const currentKec = (filterRef.current?.kecamatan || '').toLowerCase();
+
+    // Source GeoJSON batas kecamatan
+    if (!map.getSource('kecamatan-source')) {
+      map.addSource('kecamatan-source', {
+        type: 'geojson',
+        data: '/data/kecamatan-surabaya.geojson',
+      });
+    }
+
+    // Layer fill: transparan secara default, semi-transparan saat terpilih
+    if (!map.getLayer('kecamatan-fill')) {
+      map.addLayer({
+        id: 'kecamatan-fill',
+        type: 'fill',
+        source: 'kecamatan-source',
+        paint: {
+          'fill-color': '#C9972F', // Mustard accent senada tema dark/paper
+          'fill-opacity': [
+            'case',
+            ['==', ['downcase', ['get', 'name']], currentKec],
+            0.22,
+            0,
+          ],
+        },
+      });
+    }
+
+    // Layer border: garis tipis flat tanpa glow, netral kontras di peta gelap
+    if (!map.getLayer('kecamatan-border')) {
+      map.addLayer({
+        id: 'kecamatan-border',
+        type: 'line',
+        source: 'kecamatan-source',
+        paint: {
+          'line-color': isSatellite ? '#FAF6EE' : '#D4C5A9',
+          'line-width': [
+            'case',
+            ['==', ['downcase', ['get', 'name']], currentKec],
+            2.2,
+            1.2,
+          ],
+          'line-opacity': isSatellite ? 0.85 : 0.65,
+        },
+      });
+    }
+  }, []);
+
   // ─── SATU Fungsi Penambahan Source & Layer Laporan ──────────────────────────
   const addReportLayers = useCallback((map: mapboxgl.Map) => {
     const isSatellite = mapStyleRef.current === 'satelit';
@@ -410,6 +465,7 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
 
     // Dipanggil pada event 'style.load' (bukan 'load') agar dijalankan ulang setiap kali style berganti
     const handleStyleLoad = () => {
+      addKecamatanLayers(map);
       addReportLayers(map);
 
       // Hanya fetch data awal saat peta pertama kali diinisialisasi
@@ -450,7 +506,7 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       map.remove();
       mapRef.current = null;
     };
-  }, [debouncedFetchReports, addReportLayers, updateCustomMarkers]);
+  }, [debouncedFetchReports, addKecamatanLayers, addReportLayers, updateCustomMarkers]);
 
   // ─── Update GeoJSON Data saat filteredReports berubah ───────────────────────
   useEffect(() => {
@@ -482,6 +538,53 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       });
     }
   }, [selectedReport]);
+
+  // ─── Fit Bounds & Highlight saat filter kecamatan berubah ─────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const currentKec = (filter.kecamatan || '').toLowerCase();
+
+    if (map.getLayer('kecamatan-fill')) {
+      map.setPaintProperty('kecamatan-fill', 'fill-opacity', [
+        'case',
+        ['==', ['downcase', ['get', 'name']], currentKec],
+        0.22,
+        0,
+      ]);
+    }
+
+    if (map.getLayer('kecamatan-border')) {
+      map.setPaintProperty('kecamatan-border', 'line-width', [
+        'case',
+        ['==', ['downcase', ['get', 'name']], currentKec],
+        2.2,
+        1.2,
+      ]);
+    }
+
+    if (filter.kecamatan) {
+      fetchKecamatanGeoJSON().then((geojson) => {
+        const bounds = getKecamatanBounds(filter.kecamatan!, geojson);
+        if (bounds && mapRef.current) {
+          mapRef.current.fitBounds(bounds, {
+            padding: 50,
+            maxZoom: 14.5,
+            duration: 800,
+          });
+        }
+      });
+    } else {
+      // "Semua Kecamatan" mengembalikan ke tampilan seluruh kota
+      if (!isInitialLoadRef.current) {
+        map.fitBounds(SURABAYA_BOUNDS, {
+          padding: 20,
+          duration: 800,
+        });
+      }
+    }
+  }, [filter.kecamatan]);
 
   // ─── Picking location cursor ──────────────────────────────────────────────
   useEffect(() => {
@@ -538,6 +641,11 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
           </div>
         </div>
       )}
+
+      {/* ─── Atribusi Sumber Data Wilayah ──────────────────────────────────── */}
+      <div className="absolute bottom-3 right-3 z-[10] hidden sm:block px-2.5 py-1 bg-paper-white/95 border border-ink text-[10px] font-mono text-ink/80 select-none shadow-sm pointer-events-none">
+        Batas Wilayah: Pemkot Surabaya (Satu Data / Perwali No. 26/2023)
+      </div>
     </div>
   );
 };

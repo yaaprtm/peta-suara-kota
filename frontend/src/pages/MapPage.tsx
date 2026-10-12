@@ -19,6 +19,7 @@ import { useReportsStore } from '../stores/reportsStore';
 import { useAuthStore } from '../stores/authStore';
 import { createSSEConnection } from '../lib/api';
 import { Report, CATEGORY_LABELS } from '../types';
+import { fetchKecamatanGeoJSON, findKecamatanByCoordinate } from '../lib/kecamatan';
 import clsx from 'clsx';
 
 // ─── MapPage: Peta Suara Kota Surabaya ──────────────────────────────────────
@@ -62,9 +63,17 @@ const MapPage: React.FC = () => {
   const handleMapClick = useCallback(
     (latlng: { lat: number; lng: number }) => {
       if (isPickingLocation) {
-        setPickedLocation(latlng);
-        setIsPickingLocation(false);
-        toast.success('Titik koordinat berhasil dipilih.');
+        fetchKecamatanGeoJSON().then((geojson) => {
+          const match = findKecamatanByCoordinate(latlng.lng, latlng.lat, geojson);
+          if (!match) {
+            toast.error('Titik berada di luar wilayah Kota Surabaya. Silakan pilih lokasi di dalam Surabaya.');
+            return;
+          }
+          setPickedLocation(latlng);
+          setIsPickingLocation(false);
+          setIsFormOpen(true);
+          toast.success(`Titik lokasi dipilih: Kec. ${match.name}`);
+        });
       }
     },
     [isPickingLocation]

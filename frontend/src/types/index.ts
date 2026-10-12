@@ -62,6 +62,7 @@ export interface Report {
   address?: string;
   kelurahanId?: string;
   kelurahan?: Pick<Kelurahan, 'id' | 'name' | 'kecamatan'>;
+  kecamatan?: string;
   skorUrgensi: number;
   urgensiKeywords: string[];
   photos: string[];
