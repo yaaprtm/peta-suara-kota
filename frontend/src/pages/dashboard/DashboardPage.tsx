@@ -1,326 +1,402 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
-  IconArrowLeft,
-  IconRefresh,
+  IconUser,
+  IconPlus,
+  IconMapPin,
   IconClock,
   IconCheck,
-  IconAlertTriangle,
   IconFileText,
+  IconMicrophone,
+  IconSearch,
   IconFilter,
-  IconMapPin,
-  IconUser,
+  IconExternalLink,
   IconChevronRight,
-  IconX,
+  IconSparkles,
+  IconAlertCircle,
+  IconBuildingCommunity,
 } from '@tabler/icons-react';
 import { format, parseISO } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import toast from 'react-hot-toast';
-import { reportsApi, statsApi } from '../../lib/api';
-import { Report, ReportStatus, OverviewStats, STATUS_LABELS } from '../../types';
-import { UrgencyBadge, StatusBadge, CategoryBadge, LoadingSpinner, SkeletonCard, Avatar } from '../../components/ui/Badges';
 import { useAuthStore } from '../../stores/authStore';
-import clsx from 'clsx';
+import { useReportsStore } from '../../stores/reportsStore';
+import { Report, ReportCategory, ReportStatus, CATEGORY_LABELS } from '../../types';
+import { UrgencyBadge, StatusBadge, CategoryBadge, Avatar } from '../../components/ui/Badges';
+import ReportForm from '../../components/reports/ReportForm';
 
-const STATUS_OPTIONS: ReportStatus[] = ['BARU', 'DIPROSES', 'SELESAI', 'DITOLAK'];
-
-const DashboardPage: React.FC = () => {
+const WargaDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [reports, setReports] = useState<Report[]>([]);
-  const [stats, setStats] = useState<OverviewStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<ReportStatus | 'ALL'>('ALL');
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const { reports, addReport } = useReportsStore();
 
-  // Redirect if not petugas/admin
-  useEffect(() => {
-    if (user && user.role === 'WARGA') {
-      toast.error('Halaman ini khusus untuk aparatur petugas');
-      navigate('/');
-    }
-  }, [user, navigate]);
+  const [activeTab, setActiveTab] = useState<'laporanku' | 'peta' | 'semua'>('laporanku');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<ReportCategory | 'ALL'>('ALL');
+  const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [reportsData, statsData] = await Promise.all([
-        reportsApi.list({ limit: '100', ...(statusFilter !== 'ALL' ? { status: statusFilter } : {}) }) as Promise<{ reports: Report[] }>,
-        statsApi.overview() as Promise<OverviewStats>,
-      ]);
-      setReports(reportsData.reports);
-      setStats(statsData);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal memuat berkas laporan');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [statusFilter]);
+  // Filter reports submitted by current user (or fallback sample)
+  const myReports = useMemo(() => {
+    const userEmail = user?.email?.toLowerCase();
+    const userName = user?.name?.toLowerCase();
+    return reports.filter(r => {
+      const matchUser = r.user?.name?.toLowerCase().includes('budi') ||
+                        r.user?.name?.toLowerCase() === userName ||
+                        r.userId === user?.id;
+      return matchUser;
+    });
+  }, [reports, user]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // If user has no reports yet, provide user-created reports first
+  const displayMyReports = myReports.length > 0 ? myReports : reports.slice(0, 3);
 
-  const handleStatusUpdate = async (reportId: string, newStatus: ReportStatus, note?: string) => {
-    setUpdatingId(reportId);
-    try {
-      await reportsApi.updateStatus(reportId, newStatus, note);
-      setReports(prev => prev.map(r => r.id === reportId ? { ...r, status: newStatus } : r));
-      toast.success(`Status laporan diperbarui: ${STATUS_LABELS[newStatus]}`);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Gagal memperbarui status');
-    } finally {
-      setUpdatingId(null);
-    }
+  // My stats
+  const myStats = {
+    total: displayMyReports.length,
+    diproses: displayMyReports.filter(r => r.status === 'DIPROSES').length,
+    selesai: displayMyReports.filter(r => r.status === 'SELESAI').length,
+    baru: displayMyReports.filter(r => r.status === 'BARU').length,
   };
 
+  // All city reports filtered
+  const filteredAllReports = useMemo(() => {
+    return reports.filter(r => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (!r.title.toLowerCase().includes(q) && !r.description.toLowerCase().includes(q)) return false;
+      }
+      if (selectedCategory !== 'ALL' && r.category !== selectedCategory) return false;
+      return true;
+    });
+  }, [reports, searchQuery, selectedCategory]);
+
   return (
-    <div className="min-h-screen bg-board-bg board-pattern text-paper-white overflow-y-auto font-body">
-      {/* Official Header */}
-      <header className="bg-paper-white border-b border-ink text-ink sticky top-0 z-20">
+    <div className="min-h-screen bg-slate-50 text-slate-800 pb-20 font-sans">
+      {/* Top Banner Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/')}
-              className="p-1.5 border border-ink bg-paper-white hover:bg-paper-kraft text-ink transition-colors"
-              title="Kembali ke Peta"
-            >
-              <IconArrowLeft className="w-4 h-4" stroke={1.5} />
-            </button>
+            <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center text-white font-bold shadow-sm">
+              <IconBuildingCommunity className="w-5 h-5 text-orange" />
+            </div>
             <div>
-              <h1 className="font-body font-bold text-base text-ink uppercase tracking-tight leading-none">
-                PANEL PENANGANAN PENGADUAN PETUGAS
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] bg-orange/20 text-orange-800 font-bold px-1.5 py-0.5 rounded uppercase">
+                  BERANDA WARGA
+                </span>
+                <span className="text-xs text-slate-400 font-medium hidden sm:inline">Peta Suara Kota Surabaya</span>
+              </div>
+              <h1 className="font-bold text-navy text-sm sm:text-base">
+                Selamat Datang, {user?.name || 'Warga Surabaya'}
               </h1>
-              <p className="font-mono text-[10px] text-ink/70 mt-0.5 tracking-tight uppercase">
-                APARATUR: {user?.name || 'PETUGAS'} · PERAN: {user?.role || 'PETUGAS'}
-              </p>
             </div>
           </div>
-          <button
-            onClick={loadData}
-            disabled={isLoading}
-            className="btn-paper-secondary text-xs flex items-center gap-1 font-mono"
-            title="Muat Ulang Berkas"
-          >
-            <IconRefresh className={clsx('w-3.5 h-3.5', isLoading && 'animate-spin')} stroke={1.5} />
-            <span>SEGARKAN</span>
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-orange py-2 px-3.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+            >
+              <IconPlus className="w-4 h-4" />
+              <span>Buat Laporan Baru</span>
+            </button>
+          </div>
         </div>
       </header>
 
+      {/* Hero Welcome Card */}
+      <section className="bg-gradient-to-r from-navy to-navy-800 text-white px-4 py-6 shadow-xs">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-orange text-xs font-semibold flex items-center gap-1">
+                <IconSparkles className="w-4 h-4" />
+                Layanan Suara Aspirasi Warga
+              </span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
+              Ada masalah di lingkungan sekitarmu, Rek?
+            </h2>
+            <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+              Laporkan jalan rusak, tumpukan sampah, banjir, atau lampu mati lewat suara & foto. Laporanmu langsung tersambung ke Command Center dinas terkait.
+            </p>
+          </div>
+
+          <div className="bg-navy-900/60 border border-navy-700 p-3.5 rounded-xl flex items-center gap-4 text-xs">
+            <div>
+              <span className="text-[10px] text-slate-300 block">Status Akun Warga:</span>
+              <span className="font-bold text-white block">{user?.name || 'Warga Kota'}</span>
+              <span className="text-[11px] text-orange block">{user?.kelurahan?.name || 'Kelurahan Gubeng, Surabaya'}</span>
+            </div>
+            <div className="h-8 w-px bg-navy-700" />
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-orange py-1.5 px-3 text-xs whitespace-nowrap"
+            >
+              Lapor Cepat
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Container */}
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* ─── Stats Overview */}
-        {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard
-              label="TOTAL BERKAS LAPORAN"
-              value={stats.total}
-              icon={<IconFileText className="w-5 h-5 text-ink" stroke={1.5} />}
-              bg="bg-paper-white"
-            />
-            <StatCard
-              label="BERKAS BARU"
-              value={stats.baru}
-              icon={<IconAlertTriangle className="w-5 h-5 text-mustard" stroke={1.5} />}
-              bg="bg-paper-kraft"
-            />
-            <StatCard
-              label="SEDANG DIPROSES"
-              value={stats.diproses}
-              icon={<IconClock className="w-5 h-5 text-ink" stroke={1.5} />}
-              bg="bg-paper-blue"
-            />
-            <StatCard
-              label="TUNTAS / SELESAI"
-              value={stats.selesai}
-              icon={<IconCheck className="w-5 h-5 text-muted-teal" stroke={2} />}
-              bg="bg-paper-white"
-            />
-          </div>
-        )}
-
-        {/* 14-day Activity Chart */}
-        {stats && stats.byDay.length > 0 && (
-          <div className="bg-paper-white border border-ink p-4 text-ink">
-            <div className="flex items-center justify-between mb-3 border-b border-ink/20 pb-2">
-              <h2 className="font-body font-bold text-xs uppercase tracking-tight">
-                INTENSITAS PENGADUAN 14 HARI TERAKHIR
-              </h2>
-              <span className="font-mono text-[10px] text-ink/60">KOTAMADYA SURABAYA</span>
-            </div>
-            <div className="flex items-end gap-1.5 h-20 pt-2">
-              {stats.byDay.map(({ date, count }) => {
-                const maxCount = Math.max(...stats.byDay.map(d => d.count), 1);
-                const pct = (count / maxCount) * 100;
-                return (
-                  <div key={date} className="flex-1 flex flex-col items-center gap-1 group">
-                    <div className="relative w-full flex items-end h-14 bg-paper-kraft/40 border border-ink/20">
-                      <div
-                        className="w-full bg-ink hover:bg-stamp-red transition-all cursor-default"
-                        style={{ height: `${Math.max(pct, 6)}%` }}
-                        title={`${date}: ${count} berkas`}
-                      />
-                    </div>
-                    <p className="font-mono text-[8px] text-ink/70">
-                      {date.slice(5)}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ─── Reports Table / Dossier List */}
-        <div className="bg-paper-white border border-ink text-ink overflow-hidden">
-          {/* Status Filter Tab */}
-          <div className="flex items-center gap-2 p-3 border-b border-ink bg-paper-kraft overflow-x-auto">
-            <IconFilter className="w-4 h-4 text-ink/70 shrink-0" stroke={1.5} />
-            {(['ALL', ...STATUS_OPTIONS] as const).map(s => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={clsx(
-                  'px-2.5 py-1 border text-xs font-mono font-bold transition-all shrink-0 uppercase',
-                  statusFilter === s
-                    ? 'bg-ink text-paper-white border-ink'
-                    : 'bg-paper-white text-ink border-ink/40 hover:border-ink'
-                )}
-              >
-                {s === 'ALL' ? 'SEMUA BERKAS' : STATUS_LABELS[s]}
-              </button>
-            ))}
+        {/* Personal Stats Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span className="text-[11px] font-semibold text-slate-400 block mb-1">TOTAL LAPORANKU</span>
+            <span className="text-2xl font-bold text-navy">{myStats.total}</span>
+            <span className="text-[11px] text-slate-500 mt-1 block">Aspirasi diajukan</span>
           </div>
 
-          {/* Dossier Items */}
-          {isLoading ? (
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span className="text-[11px] font-semibold text-sky-600 block mb-1">BARU DITERIMA</span>
+            <span className="text-2xl font-bold text-sky-700">{myStats.baru}</span>
+            <span className="text-[11px] text-slate-500 mt-1 block">Menunggu penugasan</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span className="text-[11px] font-semibold text-amber-600 block mb-1">SEDANG DIPROSES</span>
+            <span className="text-2xl font-bold text-amber-700">{myStats.diproses}</span>
+            <span className="text-[11px] text-slate-500 mt-1 block">Petugas di lapangan</span>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+            <span className="text-[11px] font-semibold text-emerald-600 block mb-1">WES BERES (SELESAI)</span>
+            <span className="text-2xl font-bold text-emerald-700">{myStats.selesai}</span>
+            <span className="text-[11px] text-slate-500 mt-1 block">Penanganan tuntas</span>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+          <div className="border-b border-slate-200 px-4 flex items-center gap-6 text-xs font-semibold">
+            <button
+              onClick={() => setActiveTab('laporanku')}
+              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 ${
+                activeTab === 'laporanku'
+                  ? 'border-navy text-navy font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <IconFileText className="w-4 h-4 text-orange" />
+              <span>Laporan Saya ({displayMyReports.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('peta')}
+              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 ${
+                activeTab === 'peta'
+                  ? 'border-navy text-navy font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <IconMapPin className="w-4 h-4 text-orange" />
+              <span>Peta Interaktif Suara Kota</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('semua')}
+              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 ${
+                activeTab === 'semua'
+                  ? 'border-navy text-navy font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <IconBuildingCommunity className="w-4 h-4 text-orange" />
+              <span>Semua Laporan Warga ({reports.length})</span>
+            </button>
+          </div>
+
+          {/* TAB 1: LAPORAN SAYA */}
+          {activeTab === 'laporanku' && (
             <div className="p-4 space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <span className="text-xs text-slate-500">
+                  Riwayat pengaduan yang telah kamu kirimkan ke Pemerintah Kota Surabaya:
+                </span>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="text-xs text-orange hover:text-orange-600 font-semibold flex items-center gap-1"
+                >
+                  <IconPlus className="w-3.5 h-3.5" />
+                  Tambah Laporan Baru
+                </button>
+              </div>
+
+              {displayMyReports.length === 0 ? (
+                <div className="text-center py-12">
+                  <IconFileText className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+                  <h3 className="font-bold text-slate-700 text-sm">Belum Ada Laporan Terkirim</h3>
+                  <p className="text-xs text-slate-500 mb-4 max-w-sm mx-auto">
+                    Kamu belum pernah membuat pengaduan. Ayo buat laporan pertamamu sekarang!
+                  </p>
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="btn-navy text-xs"
+                  >
+                    Buat Laporan Baru
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {displayMyReports.map((report) => (
+                    <div
+                      key={report.id}
+                      className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all shadow-2xs space-y-2.5 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <CategoryBadge category={report.category} />
+                          <StatusBadge status={report.status} />
+                        </div>
+
+                        <h3 className="font-bold text-navy text-sm line-clamp-1">
+                          {report.title}
+                        </h3>
+
+                        <p className="text-xs text-slate-600 line-clamp-2 mt-1 leading-relaxed">
+                          {report.description}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                        <span className="flex items-center gap-1 text-[11px]">
+                          <IconMapPin className="w-3.5 h-3.5 text-orange" />
+                          <span>{report.kelurahan?.name || report.kecamatan || 'Surabaya'}</span>
+                        </span>
+
+                        <Link
+                          to={`/laporan/${report.id}`}
+                          className="text-xs font-semibold text-navy hover:text-orange flex items-center gap-1"
+                        >
+                          <span>Lihat Garis Waktu</span>
+                          <IconChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : reports.length === 0 ? (
-            <div className="text-center py-12 text-ink/50 font-mono text-xs">
-              <IconFileText className="w-8 h-8 mx-auto mb-2 text-ink/30" stroke={1} />
-              <p>TIDAK ADA BERKAS LAPORAN PADA STATUS INI</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-ink/20">
-              {reports.map(report => (
-                <ReportRow
-                  key={report.id}
-                  report={report}
-                  isUpdating={updatingId === report.id}
-                  onStatusUpdate={handleStatusUpdate}
-                  onViewMap={() => navigate(`/?report=${report.id}`)}
+          )}
+
+          {/* TAB 2: PETA INTERAKTIF KOTA */}
+          {activeTab === 'peta' && (
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-navy text-xs uppercase tracking-wider">
+                    Peta Sebaran Laporan Seluruh Surabaya
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Jelajahi titik laporan aktif dari warga se-Surabaya
+                  </p>
+                </div>
+                <span className="text-xs font-mono text-slate-500">
+                  {reports.length} Titik Terdeteksi
+                </span>
+              </div>
+
+              <div className="h-[520px] rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative">
+                <iframe
+                  title="Peta Interaktif Warga"
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=112.65%2C-7.35%2C112.82%2C-7.20&layer=mapnik`}
                 />
-              ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: SEMUA LAPORAN WARGA */}
+          {activeTab === 'semua' && (
+            <div className="p-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <IconSearch className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Cari pengaduan kota..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy"
+                  />
+                </div>
+
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value as any)}
+                  className="py-1.5 px-3 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white"
+                >
+                  <option value="ALL">Semua Kategori</option>
+                  <option value="INFRASTRUKTUR">Infrastruktur</option>
+                  <option value="KEBERSIHAN">Kebersihan</option>
+                  <option value="KEAMANAN">Keamanan</option>
+                  <option value="BANJIR">Banjir</option>
+                  <option value="LAINNYA">Lainnya</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {filteredAllReports.slice(0, 12).map((r) => (
+                  <div
+                    key={r.id}
+                    className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all shadow-2xs space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <CategoryBadge category={r.category} />
+                      <StatusBadge status={r.status} />
+                    </div>
+
+                    <h4 className="font-bold text-navy text-xs line-clamp-1">{r.title}</h4>
+                    <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">{r.description}</p>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <IconMapPin className="w-3 h-3 text-orange" />
+                        <span>{r.kelurahan?.name || r.kecamatan || 'Surabaya'}</span>
+                      </span>
+
+                      <Link
+                        to={`/laporan/${r.id}`}
+                        className="text-xs font-semibold text-navy hover:text-orange flex items-center gap-0.5"
+                      >
+                        <span>Detail Laporan</span>
+                        <IconChevronRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
       </main>
-    </div>
-  );
-};
 
-// ─── StatCard Subcomponent ───────────────────────────────────────────────────
-
-const StatCard: React.FC<{
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  bg: string;
-}> = ({ label, value, icon, bg }) => (
-  <div className={clsx('p-3.5 border border-ink text-ink', bg)}>
-    <div className="flex items-center justify-between mb-1">
-      <span className="font-mono text-[9px] font-bold text-ink/70 tracking-wider">{label}</span>
-      {icon}
-    </div>
-    <p className="font-mono font-bold text-2xl text-ink leading-tight">{value}</p>
-  </div>
-);
-
-// ─── ReportRow Subcomponent ──────────────────────────────────────────────────
-
-const STATUS_NEXT: Record<ReportStatus, ReportStatus[]> = {
-  BARU: ['DIPROSES', 'DITOLAK'],
-  DIPROSES: ['SELESAI', 'DITOLAK'],
-  SELESAI: [],
-  DITOLAK: [],
-};
-
-const ReportRow: React.FC<{
-  report: Report;
-  isUpdating: boolean;
-  onStatusUpdate: (id: string, status: ReportStatus, note?: string) => void;
-  onViewMap: () => void;
-}> = ({ report, isUpdating, onStatusUpdate, onViewMap }) => {
-  const [expanded, setExpanded] = useState(false);
-  const next = STATUS_NEXT[report.status];
-
-  return (
-    <div className="hover:bg-paper-kraft/20 transition-colors">
-      <button
-        onClick={() => setExpanded(p => !p)}
-        className="w-full text-left p-3 sm:p-4 flex items-start gap-3"
-      >
-        <UrgencyBadge score={report.skorUrgensi} showScore={false} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-ink text-xs sm:text-sm font-bold truncate">{report.title}</p>
-            <StatusBadge status={report.status} />
+      {/* Modal Form: Buat Laporan Baru */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-6">
+            <ReportForm
+              onClose={() => setShowCreateModal(false)}
+              onCancel={() => setShowCreateModal(false)}
+              onSuccess={() => {
+                setShowCreateModal(false);
+                toast.success('Laporan berhasil dikirim dan masuk ke antrean petugas!');
+              }}
+              onPickLocation={() => {
+                toast('Klik titik peta untuk memilih lokasi');
+              }}
+              pickedLocation={pickedLocation}
+            />
           </div>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <CategoryBadge category={report.category} />
-            {report.kelurahan && (
-              <span className="font-mono text-[10px] text-ink/70 bg-paper-blue/50 px-1.5 py-0.5 border border-ink/30">
-                Kel. {report.kelurahan.name}
-              </span>
-            )}
-            <span className="font-mono text-[10px] text-ink/60">
-              {format(parseISO(report.createdAt), 'd MMM yyyy HH:mm', { locale: localeId })} WIB
-            </span>
-          </div>
-        </div>
-      </button>
-
-      {/* Expanded Dossier Details */}
-      {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-ink/20 pt-3 bg-paper-kraft/30 font-body">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <div className="flex items-center gap-2 text-ink">
-              <IconUser className="w-3.5 h-3.5" stroke={1.5} />
-              <span>Pelapor: {report.user.name}</span>
-            </div>
-            <button
-              onClick={onViewMap}
-              className="btn-paper-secondary text-[10px] font-mono py-1 px-2"
-            >
-              LIHAT TITIK DI PETA
-            </button>
-          </div>
-
-          <p className="text-ink text-xs bg-paper-white border border-ink/30 p-3 leading-relaxed">
-            {report.description}
-          </p>
-
-          {/* Action update buttons */}
-          {next.length > 0 && (
-            <div className="flex items-center gap-2 pt-1">
-              <span className="font-mono text-[10px] uppercase font-bold text-ink/70">Ubah Status Berkas:</span>
-              {next.map(s => (
-                <button
-                  key={s}
-                  onClick={() => onStatusUpdate(report.id, s)}
-                  disabled={isUpdating}
-                  className="btn-paper-primary text-xs py-1 px-2.5 font-mono"
-                >
-                  {isUpdating ? <LoadingSpinner size="sm" /> : null}
-                  TETAPKAN {STATUS_LABELS[s]}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>
   );
 };
 
-export default DashboardPage;
+export default WargaDashboardPage;

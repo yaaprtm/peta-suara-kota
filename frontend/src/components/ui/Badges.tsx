@@ -14,10 +14,7 @@ import {
   IllustrationTuguPahlawanUmbrella,
 } from './SurabayaIllustrations';
 
-// ─── UrgencyBadge: Severity Accent (Red is ONLY for severity) ─────────────────
-// Critical = red dot + 4px left border
-// High = orange dot + 2px left border
-// Medium/Low = no accent
+// ─── UrgencyBadge: Modern Status Indicator ───────────────────────────────────
 
 interface UrgencyBadgeProps {
   score: number;
@@ -28,30 +25,25 @@ interface UrgencyBadgeProps {
 export const UrgencyBadge: React.FC<UrgencyBadgeProps> = ({ score, showScore = true, className }) => {
   const level = getUrgencyLevel(score);
 
-  if (level === 'rendah' || level === 'sedang') {
-    return (
-      <span className={clsx('inline-flex items-center gap-1 text-[11px] font-mono text-ink-dim', className)}>
-        {showScore && <span className="opacity-75">{score}</span>}
-      </span>
-    );
-  }
-
-  const isCritical = level === 'kritis';
-  const dotColor = isCritical ? 'bg-severity-critical' : 'bg-severity-high';
-  const textColor = isCritical ? 'text-severity-critical' : 'text-severity-high';
+  const config = {
+    kritis: { bg: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-600 animate-pulse' },
+    tinggi: { bg: 'bg-orange-50 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
+    sedang: { bg: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+    rendah: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  }[level];
 
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-1.5 text-[11px] font-sans font-medium',
-        textColor,
+        'inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-sans font-medium rounded-full border shadow-2xs',
+        config.bg,
         className
       )}
     >
-      <span className={clsx('w-2 h-2 rounded-full shrink-0', dotColor)} />
+      <span className={clsx('w-1.5 h-1.5 rounded-full shrink-0', config.dot)} />
       <span>{URGENCY_LABELS[level]}</span>
       {showScore && (
-        <span className="font-mono text-[10px] opacity-80 border-l border-current/30 pl-1">
+        <span className="font-mono text-[10px] opacity-75 border-l border-current/25 pl-1 ml-0.5">
           {score}
         </span>
       )}
@@ -59,8 +51,7 @@ export const UrgencyBadge: React.FC<UrgencyBadgeProps> = ({ score, showScore = t
   );
 };
 
-// ─── StatusBadge: Shape-Based (No Extra Colors) ───────────────────────────────
-// Baru = outlined, Diproses = half-filled, Selesai = filled check
+// ─── StatusBadge: Modern Badges ──────────────────────────────────────────────
 
 interface StatusBadgeProps {
   status: ReportStatus;
@@ -70,20 +61,28 @@ interface StatusBadgeProps {
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className }) => {
   const label = STATUS_LABELS_SURABAYA[status] || status;
 
+  const styleMap: Record<ReportStatus, string> = {
+    BARU: 'bg-sky-50 text-sky-800 border-sky-200',
+    DIPROSES: 'bg-amber-50 text-amber-800 border-amber-200',
+    SELESAI: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    DITOLAK: 'bg-rose-50 text-rose-800 border-rose-200',
+  };
+
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-sans text-ink border border-border-paper bg-paper-white rounded-[2px]',
+        'inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-sans font-medium border rounded-full',
+        styleMap[status] || 'bg-slate-50 text-slate-700 border-slate-200',
         className
       )}
     >
-      <StatusShape status={status} size={12} className="text-ink" />
-      <span className="font-medium">{label}</span>
+      <StatusShape status={status} size={11} />
+      <span>{label}</span>
     </span>
   );
 };
 
-// ─── CategoryBadge: Small Icon + Muted Color Left Border (Never Filled) ───────
+// ─── CategoryBadge: Clean Badge with Category Accent ─────────────────────────
 
 interface CategoryBadgeProps {
   category: ReportCategory;
@@ -91,20 +90,19 @@ interface CategoryBadgeProps {
 }
 
 export const getCategoryIcon = (category: ReportCategory, className = 'w-3.5 h-3.5') => {
-  const catColor = CATEGORY_COLORS[category] || '#8A7F70';
+  const catColor = CATEGORY_COLORS[category] || '#1E3A5F';
   return <CategoryGlyph category={category} strokeColor={catColor} className={className} />;
 };
 
 export const CategoryBadge: React.FC<CategoryBadgeProps> = ({ category, className }) => {
-  const catColor = CATEGORY_COLORS[category] || '#8A7F70';
+  const catColor = CATEGORY_COLORS[category] || '#1E3A5F';
 
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-sans font-medium text-ink bg-paper-white border border-border-paper rounded-[2px]',
+        'inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-sans font-medium text-navy bg-navy-50/70 border border-navy-100 rounded-md',
         className
       )}
-      style={{ borderLeftWidth: '3px', borderLeftColor: catColor }}
     >
       <CategoryGlyph category={category} strokeColor={catColor} size={13} />
       <span>{CATEGORY_LABELS[category]}</span>

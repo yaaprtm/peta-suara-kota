@@ -2,29 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Peta Suara Kota Design Tokens (Civic Newspaper & Surabaya Identity) ─── */
+/* ─── Peta Suara Kota Design Tokens (Surabaya Civic Platform) ─── */
 
 :root {
-  --paper-bg: #F4EEDF;
-  --paper-white: #FAF6EE;
-  --paper-card: #FAF6EE;
-  --paper-kraft: #E8D9B5;
-  --ink: #1E1B16;
-  --ink-dim: #5E584E;
-  --ink-muted: #8E8679;
-  --border-paper: #CFC4AB;
-  --border-subtle: #E2D9C5;
+  --base: #FFFFFF;
+  --bg-canvas: #F8FAFC;
+  --primary-navy: #1E3A5F;
+  --secondary-orange: #F5A524;
+  --text-primary: #10213A;
+  --text-secondary: #4A5B73;
+  --border-color: #E2E8F0;
 
-  /* Red is reserved ONLY for severity */
-  --severity-critical: #C0392B;
-  --severity-high: #D9822B;
+  /* Urgency Levels */
+  --urgency-kritis: #DC2626;
+  --urgency-tinggi: #EA580C;
+  --urgency-sedang: #F5A524;
+  --urgency-rendah: #10B981;
 
-  /* Category colors */
-  --cat-infrastruktur: #3E5C76;
-  --cat-kebersihan: #5E7C4A;
-  --cat-keamanan: #5B3F6E;
-  --cat-banjir: #2A7F86;
-  --cat-lainnya: #8A7F70;
+  /* Category Colors */
+  --cat-infrastruktur: #1E3A5F;
+  --cat-kebersihan: #059669;
+  --cat-keamanan: #7C3AED;
+  --cat-banjir: #0284C7;
+  --cat-lainnya: #4A5B73;
+
+  /* Legacy mappings */
+  --paper-bg: #FFFFFF;
+  --paper-white: #FFFFFF;
+  --paper-card: #FFFFFF;
+  --paper-kraft: #F1F5F9;
+  --ink: #10213A;
+  --ink-dim: #4A5B73;
+  --ink-muted: #7C8BA1;
+  --border-paper: #E2E8F0;
+  --border-subtle: #F1F5F9;
+  --severity-critical: #DC2626;
+  --severity-high: #EA580C;
 }
 
 *, *::before, *::after {
@@ -36,8 +49,8 @@ html, body, #root {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: var(--paper-bg);
-  color: var(--ink);
+  background-color: #FFFFFF;
+  color: var(--text-primary);
 }
 
 body {
@@ -46,107 +59,89 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Paper Texture & Civic Newspaper Patterns ────────────────────────────── */
-
-.paper-grain {
-  background-color: var(--paper-bg);
-  background-image: radial-gradient(rgba(30, 27, 22, 0.04) 1px, transparent 1px);
-  background-size: 8px 8px;
-}
-
-/* Subtle red-and-white accent line under top bar */
+/* Subtle accent banner line */
 .surabaya-accent-line {
-  height: 2px;
+  height: 3px;
   width: 100%;
-  background: repeating-linear-gradient(
-    90deg,
-    #C0392B,
-    #C0392B 12px,
-    #FAF6EE 12px,
-    #FAF6EE 24px
-  );
+  background: linear-gradient(90deg, #1E3A5F 0%, #1E3A5F 50%, #F5A524 50%, #F5A524 100%);
 }
 
-/* Base Paper Document Card (2px rounded, 1px border) */
-.paper-card {
-  border: 1px solid var(--border-paper);
-  background-color: var(--paper-white);
-  border-radius: 2px;
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+/* Modern Card */
+.paper-card, .modern-card {
+  border: 1px solid #E2E8F0;
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px 0 rgba(16, 33, 58, 0.04);
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 
-.paper-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--ink);
-  box-shadow: 0 2px 4px rgba(30, 27, 22, 0.08);
+.paper-card:hover, .modern-card:hover {
+  transform: translateY(-1px);
+  border-color: #CBD5E1;
+  box-shadow: 0 4px 6px -1px rgba(16, 33, 58, 0.08);
 }
 
-/* ─── Clean Custom Scrollbars in Warm Paper Palette ───────────────────────── */
-
+/* Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--paper-bg);
+  background: #F8FAFC;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D4C9B2;
-  border-radius: 2px;
+  background: #CBD5E1;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-paper);
+  background: #94A3B8;
 }
 
 /* ─── Components ──────────────────────────────────────────────────────────── */
 
 @layer components {
-  /* Real Form Checkbox */
-  .paper-checkbox {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 16px;
-    height: 16px;
-    border: 1.5px solid var(--ink);
-    background-color: var(--paper-white);
-    border-radius: 2px;
-    cursor: pointer;
-    display: inline-grid;
-    place-content: center;
-    transition: background-color 0.1s ease;
+  .btn-navy {
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 font-sans font-medium text-xs text-white
+           bg-navy hover:bg-navy-600 active:bg-navy-700
+           rounded-md transition-all duration-150 shadow-sm cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  .paper-checkbox:checked {
-    background-color: var(--ink);
+  .btn-orange {
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 font-sans font-medium text-xs text-white
+           bg-orange hover:bg-orange-600 active:bg-orange-700
+           rounded-md transition-all duration-150 shadow-sm cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  /* Paper Primary Button (No generic gradients) */
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 font-sans font-medium text-xs text-ink
+           border border-ink-border bg-white hover:bg-slate-50 hover:border-slate-300
+           rounded-md transition-all duration-150 cursor-pointer select-none;
+  }
+
+  /* Backward compatible buttons */
   .btn-paper-primary {
-    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 font-sans font-medium text-xs text-paper-white
-           border border-ink bg-ink hover:bg-ink-dim active:translate-y-[1px]
-           rounded-[2px] transition-all duration-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer select-none;
+    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 font-sans font-medium text-xs text-white
+           bg-navy hover:bg-navy-600 active:bg-navy-700
+           rounded-md transition-all duration-150 shadow-sm cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  /* Paper Secondary Button */
   .btn-paper-secondary {
     @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 font-sans font-medium text-xs text-ink
-           border border-border-paper bg-paper-white hover:bg-paper-kraft hover:border-ink active:translate-y-[1px]
-           rounded-[2px] transition-all duration-100 cursor-pointer select-none;
+           border border-ink-border bg-white hover:bg-slate-50 hover:border-slate-300
+           rounded-md transition-all duration-150 cursor-pointer select-none;
   }
 
-  /* Danger Button */
   .btn-paper-danger {
-    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 font-sans font-medium text-xs text-paper-white
-           border border-ink bg-severity-critical hover:opacity-95 active:translate-y-[1px]
-           rounded-[2px] transition-all duration-100 cursor-pointer select-none;
+    @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 font-sans font-medium text-xs text-white
+           bg-red-600 hover:bg-red-700
+           rounded-md transition-all duration-150 cursor-pointer select-none;
   }
 
-  /* Paper Inputs */
   .input-paper {
-    @apply w-full bg-paper-white border border-border-paper text-ink
-           placeholder-ink-muted px-3 py-2 text-xs font-sans rounded-[2px]
-           focus:outline-none focus:border-ink
-           transition-all duration-100;
+    @apply w-full bg-white border border-slate-200 text-ink
+           placeholder-ink-muted px-3 py-2 text-xs font-sans rounded-md
+           focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy
+           transition-all duration-150;
   }
 }
 

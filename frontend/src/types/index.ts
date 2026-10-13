@@ -1,6 +1,6 @@
 // ─── Domain Types ─────────────────────────────────────────────────────────────
 
-export type UserRole = 'WARGA' | 'PETUGAS' | 'ADMIN';
+export type UserRole = 'WARGA' | 'PETUGAS' | 'ADMIN' | 'SUPERADMIN';
 export type UrgencyLevel = 'rendah' | 'sedang' | 'tinggi' | 'kritis';
 
 // ─── Enums as const objects (iterable with Object.values()) ──────────────────
@@ -30,6 +30,26 @@ export interface User {
   phone?: string;
   avatar?: string;
   kelurahan?: Kelurahan;
+  isActive?: boolean;
+  createdAt?: string;
+}
+
+export interface MasterCategory {
+  id: string;
+  name: string;
+  type: ReportCategory;
+  icon: string;
+  description: string;
+  baseScore: number;
+}
+
+export interface MasterLevel {
+  level: UrgencyLevel;
+  name: string;
+  minScore: number;
+  maxScore: number;
+  color: string;
+  targetResponseHours: number;
 }
 
 export interface Kelurahan {
@@ -170,10 +190,10 @@ export function getUrgencyLevel(score: number): UrgencyLevel {
 }
 
 export function getUrgencyColor(score: number): string {
-  if (score >= 80) return '#B23327';
-  if (score >= 60) return '#C9972F';
-  if (score >= 35) return '#C9972F';
-  return '#4A7A6E';
+  if (score >= 80) return '#DC2626';
+  if (score >= 60) return '#EA580C';
+  if (score >= 35) return '#F5A524';
+  return '#10B981';
 }
 
 export function getUrgencySize(score: number): number {

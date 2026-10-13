@@ -7,55 +7,71 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Civic Newspaper Design Tokens
-        paper: '#F4EEDF',
-        'paper-bg': '#F4EEDF',
-        'paper-white': '#FAF6EE',
-        'paper-card': '#FAF6EE',
-        'paper-kraft': '#E8D9B5',
-        ink: '#1E1B16',
-        'ink-dim': '#5E584E',
-        'ink-muted': '#8E8679',
-        'border-paper': '#CFC4AB',
-        'border-subtle': '#E2D9C5',
+        // Theme Colors
+        navy: {
+          DEFAULT: '#1E3A5F',
+          50: '#F0F5FA',
+          100: '#E1EBF5',
+          200: '#C3D7EC',
+          300: '#94B8DC',
+          400: '#5A91C5',
+          500: '#1E3A5F',
+          600: '#183151',
+          700: '#132640',
+          800: '#0F1D30',
+          900: '#0A1320',
+        },
+        orange: {
+          DEFAULT: '#F5A524',
+          50: '#FFF9ED',
+          100: '#FEF2D6',
+          200: '#FDE4AB',
+          300: '#FBD175',
+          400: '#F8B943',
+          500: '#F5A524',
+          600: '#DB8912',
+          700: '#B5680E',
+          800: '#915013',
+          900: '#764213',
+        },
+        ink: {
+          DEFAULT: '#10213A',
+          dim: '#4A5B73',
+          muted: '#7C8BA1',
+          subtle: '#94A3B8',
+          border: '#E2E8F0',
+        },
+        base: '#FFFFFF',
+        surface: '#FFFFFF',
+        canvas: '#F8FAFC',
+        card: '#FFFFFF',
 
-        // Severity (Red is ONLY for severity)
-        'severity-critical': '#C0392B',
-        'severity-high': '#D9822B',
-        kritis: '#C0392B',
-        tinggi: '#D9822B',
+        // Urgency Colors
+        urgency: {
+          kritis: '#DC2626',
+          tinggi: '#EA580C',
+          sedang: '#F5A524',
+          rendah: '#10B981',
+        },
 
-        // Category Identity Colors (Muted)
-        'cat-infrastruktur': '#3E5C76',
-        'cat-kebersihan': '#5E7C4A',
-        'cat-keamanan': '#5B3F6E',
-        'cat-banjir': '#2A7F86',
-        'cat-lainnya': '#8A7F70',
-
-        // Legacy / accent tokens
-        'board-bg': '#F4EEDF',
-        'stamp-red': '#C0392B',
-        'mustard': '#C9972F',
-        'paper-blue': '#E1EAF0',
+        // Category identity
+        cat: {
+          infrastruktur: '#1E3A5F',
+          kebersihan: '#059669',
+          keamanan: '#7C3AED',
+          banjir: '#0284C7',
+          lainnya: '#4A5B73',
+        },
       },
       fontFamily: {
-        display: ['"Fraunces"', 'serif'],
-        serif: ['"Fraunces"', 'serif'],
-        wordmark: ['"Fraunces"', 'serif'],
-        sans: ['"Inter"', 'sans-serif'],
-        body: ['"Inter"', 'sans-serif'],
+        sans: ['"Inter"', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['"Inter"', 'sans-serif'],
         mono: ['"Courier Prime"', 'monospace'],
       },
-      borderRadius: {
-        DEFAULT: '2px',
-        sm: '2px',
-        md: '2px',
-        lg: '2px',
-        xl: '2px',
-      },
       boxShadow: {
-        // Physical subtle borders & flat depth without digital glow slop
-        'paper-flat': '0 0 0 1px #2B2822',
+        card: '0 1px 3px 0 rgba(16, 33, 58, 0.06), 0 1px 2px -1px rgba(16, 33, 58, 0.04)',
+        elevated: '0 4px 6px -1px rgba(16, 33, 58, 0.08), 0 2px 4px -2px rgba(16, 33, 58, 0.05)',
+        modal: '0 20px 25px -5px rgba(16, 33, 58, 0.12), 0 8px 10px -6px rgba(16, 33, 58, 0.08)',
       },
     },
   },

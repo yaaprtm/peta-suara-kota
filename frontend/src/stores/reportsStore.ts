@@ -24,7 +24,8 @@ interface ReportsState {
   setFilter: (filter: Partial<MapFilter>) => void;
   setTimeRange: (start: Date, end: Date) => void;
   addReport: (report: Report) => void;
-  updateReportStatus: (reportId: string, status: Report['status']) => void;
+  updateReportStatus: (reportId: string, status: Report['status'], note?: string, changedBy?: { id: string; name: string; role: any }) => void;
+  resetReports: () => void;
   openPanel: () => void;
   closePanel: () => void;
 }
@@ -146,16 +147,39 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
     set({ reports, filteredReports: filtered });
   },
 
-  updateReportStatus: (reportId, status) => {
-    const reports = get().reports.map(r =>
-      r.id === reportId ? { ...r, status } : r
-    );
+  updateReportStatus: (reportId, status, note, changedBy) => {
+    const reports = get().reports.map(r => {
+      if (r.id !== reportId) return r;
+      const logs = r.statusLogs || [];
+      const newLog = {
+        id: `log-${Date.now()}`,
+        reportId,
+        fromStatus: r.status,
+        toStatus: status,
+        note: note || `Status diperbarui menjadi ${status}`,
+        changedAt: new Date().toISOString(),
+        changedBy: changedBy || { id: 'petugas-1', name: 'Petugas Pelaksana', role: 'PETUGAS' },
+      };
+      return {
+        ...r,
+        status,
+        statusLogs: [newLog, ...logs],
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
     const selectedReport = get().selectedReport;
     const updatedSelected = selectedReport?.id === reportId
-      ? { ...selectedReport, status }
+      ? reports.find(r => r.id === reportId) || selectedReport
       : selectedReport;
     const filtered = applyFilters(reports, get().filter, get().timeRange);
     set({ reports, filteredReports: filtered, selectedReport: updatedSelected });
+  },
+
+  resetReports: () => {
+    const { filter, timeRange } = get();
+    const filtered = applyFilters(DUMMY_REPORTS, filter, timeRange);
+    set({ reports: DUMMY_REPORTS, filteredReports: filtered, selectedReport: null });
   },
 
   openPanel: () => set({ isPanelOpen: true }),

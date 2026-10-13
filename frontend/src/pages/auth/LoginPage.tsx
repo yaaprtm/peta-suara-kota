@@ -6,8 +6,9 @@ import {
   IconEyeOff,
   IconUser,
   IconShield,
+  IconCrown,
   IconArrowLeft,
-  IconFileText,
+  IconBuildingCommunity,
 } from '@tabler/icons-react';
 import { useAuthStore } from '../../stores/authStore';
 import toast from 'react-hot-toast';
@@ -16,89 +17,85 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login, isLoading } = useAuthStore();
+  const { login, loginAsRole, isLoading } = useAuthStore();
   const navigate = useNavigate();
+
+  const redirectByRole = (role?: string) => {
+    if (role === 'PETUGAS') navigate('/petugas');
+    else if (role === 'SUPERADMIN' || role === 'ADMIN') navigate('/superadmin');
+    else navigate('/dashboard');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, password);
-      toast.success('Autentikasi berhasil. Selamat datang!');
-      navigate('/');
+      const loggedUser = await login(email, password);
+      toast.success(`Selamat datang, ${loggedUser.name}!`);
+      redirectByRole(loggedUser.role);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Autentikasi gagal';
       toast.error(msg);
     }
   };
 
-  const handleDemo = async (role: 'warga' | 'petugas') => {
-    const credentials = {
-      warga: { email: 'demo@petasuarakota.id', password: 'password123' },
-      petugas: { email: 'petugas.pu@petasuarakota.id', password: 'password123' },
-    };
-    const cred = credentials[role];
-    try {
-      await login(cred.email, cred.password);
-      toast.success(`Masuk sebagai ${role}`);
-      navigate('/');
-    } catch {
-      toast.error('Gagal login demo. Pastikan server aktif.');
-    }
+  const handleDemo = (role: 'WARGA' | 'PETUGAS' | 'SUPERADMIN') => {
+    const user = loginAsRole(role);
+    toast.success(`Masuk mode uji coba sebagai: ${role}`);
+    redirectByRole(user.role);
   };
 
   return (
-    <div className="min-h-screen bg-board-bg board-pattern flex items-center justify-center p-4 font-body">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
       <div className="w-full max-w-md relative">
         {/* Back Link */}
         <div className="mb-4">
           <button
             onClick={() => navigate('/')}
-            className="btn-paper-secondary text-xs font-mono inline-flex items-center gap-1.5"
+            className="btn-outline text-xs inline-flex items-center gap-1.5"
           >
-            <IconArrowLeft className="w-3.5 h-3.5" stroke={1.5} />
-            <span>KEMBALI KE PETA SURABAYA</span>
+            <IconArrowLeft className="w-3.5 h-3.5 text-navy" />
+            <span>Kembali ke Beranda Publik</span>
           </button>
         </div>
 
-        {/* Paper Document Card */}
-        <div className="bg-paper-white border border-ink p-6 text-ink">
+        {/* Login Card */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-sm">
           {/* Header */}
-          <div className="border-b border-ink/40 pb-4 mb-5 text-center">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <span className="font-wordmark font-bold text-2xl text-ink">
-                Peta Suara Kota
-              </span>
+          <div className="text-center pb-5 mb-5 border-b border-slate-100">
+            <div className="w-12 h-12 rounded-xl bg-navy flex items-center justify-center text-white mx-auto mb-2 shadow-sm">
+              <IconBuildingCommunity className="w-6 h-6 text-orange" />
             </div>
-            <p className="font-mono text-[10px] uppercase text-ink/70 tracking-wider">
-              KOTAMADYA SURABAYA · BLANGKO AKSES ARSIP
+            <h1 className="font-bold text-lg text-navy tracking-tight">
+              Peta Suara Kota Surabaya
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              Portal Akses Warga, Petugas, dan Superadmin
             </p>
           </div>
 
-          <h2 className="font-body font-bold text-base text-ink uppercase tracking-tight mb-4">
-            MASUK KE AKUN TERDAFTAR
-          </h2>
-
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
-              <label className="font-mono text-[11px] font-bold uppercase tracking-wider text-ink/80 block mb-1" htmlFor="login-email">
-                ALAMAT SUREL (EMAIL)
+              <label className="font-semibold text-slate-700 block mb-1.5" htmlFor="login-email">
+                Alamat Email Terdaftar
               </label>
               <input
                 id="login-email"
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="nama@domain.id"
-                className="input-paper text-xs"
+                placeholder="nama@surabaya.go.id"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
                 required
                 autoComplete="email"
               />
             </div>
 
             <div>
-              <label className="font-mono text-[11px] font-bold uppercase tracking-wider text-ink/80 block mb-1" htmlFor="login-password">
-                KATA SANDI (PASSWORD)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="font-semibold text-slate-700 block" htmlFor="login-password">
+                  Kata Sandi
+                </label>
+              </div>
               <div className="relative">
                 <input
                   id="login-password"
@@ -106,17 +103,17 @@ const LoginPage: React.FC = () => {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="input-paper text-xs pr-9"
+                  className="w-full p-2.5 pr-9 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
                   required
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(p => !p)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/60 hover:text-ink"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-navy"
                   title={showPassword ? 'Sembunyikan' : 'Tampilkan'}
                 >
-                  {showPassword ? <IconEyeOff className="w-4 h-4" stroke={1.5} /> : <IconEye className="w-4 h-4" stroke={1.5} />}
+                  {showPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -124,47 +121,61 @@ const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="btn-paper-primary w-full py-2.5 text-xs font-mono font-bold flex items-center justify-center gap-1.5"
+              className="btn-navy w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm"
             >
               {isLoading ? (
                 <>
-                  <IconLoader2 className="w-4 h-4 animate-spin" stroke={1.5} />
-                  <span>MEMVERIFIKASI...</span>
+                  <IconLoader2 className="w-4 h-4 animate-spin text-orange" />
+                  <span>Memverifikasi akun...</span>
                 </>
               ) : (
-                'MASUK SEKARANG'
+                'Masuk Sekarang'
               )}
             </button>
           </form>
 
-          {/* Quick demo login */}
-          <div className="mt-5 pt-4 border-t border-ink/20">
-            <p className="font-mono text-[10px] text-center text-ink/60 mb-2 uppercase">
-              AKUN UJI COBA (DEMO)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
+          {/* Quick Demo Testing Switchers */}
+          <div className="mt-6 pt-5 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Uji Coba Cepat (Testing / Demo):
+              </span>
+              <span className="text-[10px] text-orange font-semibold">1-Klik Masuk</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => handleDemo('warga')}
-                className="btn-paper-secondary text-xs font-mono flex items-center justify-center gap-1.5 py-1.5"
+                onClick={() => handleDemo('WARGA')}
+                className="p-2 rounded-lg border border-slate-200 hover:border-navy bg-slate-50 hover:bg-slate-100 text-navy font-semibold text-[11px] flex flex-col items-center justify-center gap-1 transition-all"
               >
-                <IconUser className="w-3.5 h-3.5" stroke={1.5} />
-                <span>WARGA</span>
+                <IconUser className="w-4 h-4 text-sky-600" />
+                <span>Warga</span>
               </button>
+
               <button
                 type="button"
-                onClick={() => handleDemo('petugas')}
-                className="btn-paper-secondary text-xs font-mono flex items-center justify-center gap-1.5 py-1.5"
+                onClick={() => handleDemo('PETUGAS')}
+                className="p-2 rounded-lg border border-slate-200 hover:border-navy bg-slate-50 hover:bg-slate-100 text-navy font-semibold text-[11px] flex flex-col items-center justify-center gap-1 transition-all"
               >
-                <IconShield className="w-3.5 h-3.5" stroke={1.5} />
-                <span>PETUGAS</span>
+                <IconShield className="w-4 h-4 text-orange" />
+                <span>Petugas</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDemo('SUPERADMIN')}
+                className="p-2 rounded-lg border border-slate-200 hover:border-navy bg-slate-50 hover:bg-slate-100 text-navy font-semibold text-[11px] flex flex-col items-center justify-center gap-1 transition-all"
+              >
+                <IconCrown className="w-4 h-4 text-purple-600" />
+                <span>Superadmin</span>
               </button>
             </div>
           </div>
 
-          <p className="text-center font-body text-xs text-ink/70 mt-5">
-            Belum terdaftar?{' '}
-            <Link to="/register" className="font-bold underline text-ink hover:text-stamp-red">
+          <p className="text-center text-xs text-slate-500 mt-5">
+            Belum punya akun warga?{' '}
+            <Link to="/register" className="font-bold text-navy hover:text-orange underline">
               Daftar akun warga baru
             </Link>
           </p>
