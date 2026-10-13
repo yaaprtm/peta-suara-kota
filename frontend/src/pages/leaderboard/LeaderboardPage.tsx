@@ -10,6 +10,8 @@ import {
 import { statsApi } from '../../lib/api';
 import { LeaderboardEntry } from '../../types';
 import { LoadingSpinner, SkeletonCard } from '../../components/ui/Badges';
+import LanguageToggle from '../../components/ui/LanguageToggle';
+import { useTranslation } from '../../i18n/useTranslation';
 import clsx from 'clsx';
 
 // Sample fallback leaderboard if backend is offline
@@ -24,6 +26,7 @@ const SAMPLE_LEADERBOARD: LeaderboardEntry[] = [
 
 const LeaderboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [entries, setEntries] = useState<LeaderboardEntry[]>(SAMPLE_LEADERBOARD);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -53,7 +56,7 @@ const LeaderboardPage: React.FC = () => {
             <button
               onClick={() => navigate('/')}
               className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
-              title="Kembali"
+              title={t('common.back')}
             >
               <IconArrowLeft className="w-4 h-4" />
             </button>
@@ -61,18 +64,21 @@ const LeaderboardPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <IconTrophy className="w-4 h-4 text-orange" />
                 <h1 className="font-bold text-navy text-sm sm:text-base leading-none">
-                  PAPAN SKOR KELURAHAN KOTA SURABAYA
+                  {t('leaderboard.headerTitle')}
                 </h1>
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Peringkat Kinerja Respons & Kecepatan Penyelesaian Pengaduan Warga
+                {t('leaderboard.headerSubtitle')}
               </p>
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-navy-50 text-navy px-3 py-1.5 rounded-lg border border-navy-100">
-            <IconBuildingCommunity className="w-4 h-4 text-orange" />
-            <span>Wilayah Kota Surabaya</span>
+          <div className="flex items-center gap-2">
+            <LanguageToggle className="hidden sm:inline-flex" />
+            <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-navy-50 text-navy px-3 py-1.5 rounded-lg border border-navy-100">
+              <IconBuildingCommunity className="w-4 h-4 text-orange" />
+              <span>{t('leaderboard.regionBadge')}</span>
+            </div>
           </div>
         </div>
       </header>
@@ -100,8 +106,8 @@ const LeaderboardPage: React.FC = () => {
         {!isLoading && entries.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
             <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs font-bold text-navy uppercase">
-              <span>Daftar Peringkat Kelurahan Teraktif</span>
-              <span className="text-[11px] text-slate-500 font-mono">{entries.length} Kelurahan Terdata</span>
+              <span>{t('leaderboard.tableTitle')}</span>
+              <span className="text-[11px] text-slate-500 font-mono">{t('leaderboard.tableCount', { count: entries.length })}</span>
             </div>
 
             <div className="divide-y divide-slate-100">
@@ -114,18 +120,13 @@ const LeaderboardPage: React.FC = () => {
                     key={entry.kelurahan.id}
                     className="p-3.5 hover:bg-slate-50/70 transition-colors flex items-center gap-3.5 text-xs"
                   >
-                    <span
-                      className={clsx(
-                        'w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0',
-                        rank === 1
-                          ? 'bg-orange text-navy-900 font-black shadow-xs'
-                          : rank === 2
-                          ? 'bg-slate-200 text-slate-800'
-                          : rank === 3
-                          ? 'bg-amber-100 text-amber-900'
-                          : 'bg-slate-100 text-slate-600'
-                      )}
-                    >
+                    <span className={clsx(
+                      'w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0',
+                      rank === 1 ? 'bg-orange text-navy-900 font-black shadow-xs'
+                      : rank === 2 ? 'bg-slate-200 text-slate-800'
+                      : rank === 3 ? 'bg-amber-100 text-amber-900'
+                      : 'bg-slate-100 text-slate-600'
+                    )}>
                       #{rank}
                     </span>
 
@@ -133,30 +134,31 @@ const LeaderboardPage: React.FC = () => {
                       <div className="flex items-center justify-between mb-1.5">
                         <div>
                           <span className="font-bold text-sm text-navy uppercase tracking-tight">
-                            Kelurahan {entry.kelurahan.name}
+                            {t('leaderboard.kelurahanPrefix')} {entry.kelurahan.name}
                           </span>
                           <span className="text-[11px] text-slate-500 ml-2">
-                            Kec. {entry.kelurahan.kecamatan}
+                            {t('leaderboard.kecamatanPrefix')} {entry.kelurahan.kecamatan}
                           </span>
                         </div>
-                        <span className="font-bold text-navy text-sm font-mono">{entry.score} PTS</span>
+                        <span className="font-bold text-navy text-sm font-mono">
+                          {t('leaderboard.scoreUnit', { score: entry.score })}
+                        </span>
                       </div>
 
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-navy rounded-full transition-all duration-300"
-                          style={{ width: `${barWidth}%` }}
-                        />
+                        <div className="h-full bg-navy rounded-full transition-all duration-300" style={{ width: `${barWidth}%` }} />
                       </div>
 
                       <div className="flex items-center gap-4 mt-2 text-[11px] text-slate-500">
                         <span className="flex items-center gap-1 font-medium text-emerald-700">
                           <IconCheck className="w-3.5 h-3.5 text-emerald-600" />
-                          {entry.resolvedReports}/{entry.totalReports} Laporan Selesai ({entry.resolutionRate}%)
+                          {t('leaderboard.resolutionText', { done: entry.resolvedReports, total: entry.totalReports, pct: entry.resolutionRate })}
                         </span>
                         <span className="flex items-center gap-1">
                           <IconClock className="w-3.5 h-3.5 text-slate-400" />
-                          Rata-rata Respon: {entry.avgResponseHours !== null ? `${entry.avgResponseHours} Jam` : '-'}
+                          {entry.avgResponseHours !== null
+                            ? t('leaderboard.avgResponse', { hours: entry.avgResponseHours })
+                            : t('leaderboard.avgResponseNone')}
                         </span>
                       </div>
                     </div>
@@ -180,37 +182,24 @@ interface PodiumCardProps {
 }
 
 const PodiumCard: React.FC<PodiumCardProps> = ({ entry, rank, isFirst }) => {
+  const { t } = useTranslation();
   return (
-    <div
-      className={clsx(
-        'p-4 rounded-xl flex flex-col items-center text-center border transition-all flex-1 max-w-[220px]',
-        isFirst
-          ? 'bg-white border-orange shadow-md -translate-y-3 ring-2 ring-orange/30'
-          : 'bg-white border-slate-200 shadow-2xs'
-      )}
-    >
-      <div
-        className={clsx(
-          'w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 shadow-xs',
-          isFirst
-            ? 'bg-orange text-navy-900 font-black'
-            : rank === 2
-            ? 'bg-slate-200 text-slate-800'
-            : 'bg-amber-100 text-amber-900'
-        )}
-      >
+    <div className={clsx(
+      'p-4 rounded-xl flex flex-col items-center text-center border transition-all flex-1 max-w-[220px]',
+      isFirst ? 'bg-white border-orange shadow-md -translate-y-3 ring-2 ring-orange/30' : 'bg-white border-slate-200 shadow-2xs'
+    )}>
+      <div className={clsx(
+        'w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-2 shadow-xs',
+        isFirst ? 'bg-orange text-navy-900 font-black' : rank === 2 ? 'bg-slate-200 text-slate-800' : 'bg-amber-100 text-amber-900'
+      )}>
         #{rank}
       </div>
-
-      <div className="font-bold text-xs text-navy uppercase truncate w-full">
-        {entry.kelurahan.name}
+      <div className="font-bold text-xs text-navy uppercase truncate w-full">{entry.kelurahan.name}</div>
+      <div className="text-[10px] text-slate-500 truncate w-full mb-2">
+        {t('leaderboard.kecamatanPrefix')} {entry.kelurahan.kecamatan.toUpperCase()}
       </div>
-      <div className="text-[10px] text-slate-400 truncate w-full mb-2">
-        KEC. {entry.kelurahan.kecamatan.toUpperCase()}
-      </div>
-
-      <div className="font-bold text-base text-navy font-mono">{entry.score} PTS</div>
-      <div className="text-[9px] text-slate-400 uppercase font-semibold">SKOR KINERJA</div>
+      <div className="font-bold text-base text-navy font-mono">{t('leaderboard.scoreUnit', { score: entry.score })}</div>
+      <div className="text-[9px] text-slate-500 uppercase font-semibold">{t('leaderboard.scoreKinerja')}</div>
     </div>
   );
 };

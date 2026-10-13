@@ -18,6 +18,7 @@ import { reportsApi } from '../../lib/api';
 import { Report } from '../../types';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const STATUS_TRANSITIONS: Record<Report['status'], Report['status'][]> = {
   BARU: ['DIPROSES', 'DITOLAK'],
@@ -31,6 +32,7 @@ const STATUS_TRANSITIONS: Record<Report['status'], Report['status'][]> = {
 const ReportDetailPanel: React.FC = () => {
   const { selectedReport, isPanelOpen, closePanel, updateReportStatus } = useReportsStore();
   const { user } = useAuthStore();
+  const { t } = useTranslation();
   const [photoIdx, setPhotoIdx] = useState(0);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [noteInput, setNoteInput] = useState('');
@@ -47,13 +49,13 @@ const ReportDetailPanel: React.FC = () => {
       try {
         await reportsApi.updateStatus(selectedReport.id, status, noteInput || undefined);
         updateReportStatus(selectedReport.id, status);
-        toast.success(`Status wes diperbarui: ${status}`, {
+        toast.success(t('panel.updateSuccess', { status }), {
           style: { background: '#FAF6EE', color: '#2B2822', border: '1px solid #2B2822' },
         });
         setShowStatusForm(false);
         setNoteInput('');
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Waduh, gagal update status. Coba lagi.';
+        const msg = err instanceof Error ? err.message : t('panel.updateFailed');
         toast.error(msg);
       } finally {
         setIsUpdatingStatus(false);
@@ -84,14 +86,14 @@ const ReportDetailPanel: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconBuildingCommunity className="w-4 h-4 text-ink/80" />
             <span className="font-mono text-xs font-bold text-ink tracking-wider">
-              BERKAS // #{report.id.slice(0, 8).toUpperCase()}
+              {t('panel.dossierPrefix')}{report.id.slice(0, 8).toUpperCase()}
             </span>
           </div>
           <button
             type="button"
             onClick={closePanel}
             className="p-1 text-ink hover:bg-paper-white border border-ink/40 transition-colors cursor-pointer"
-            aria-label="Tutup panel"
+            aria-label={t('panel.closePanel')}
           >
             <IconX className="w-4 h-4" />
           </button>
@@ -114,10 +116,10 @@ const ReportDetailPanel: React.FC = () => {
         {report.status === 'SELESAI' && (
           <div className="p-3 bg-paper-kraft/40 border border-ink flex items-center justify-between">
             <div>
-              <div className="font-sans font-bold text-xs text-ink">Wes Beres & Terkonfirmasi</div>
-              <div className="font-mono text-[11px] text-ink/70">Petugas wes nangani laporan iki.</div>
+              <div className="font-sans font-bold text-xs text-ink">{t('panel.completedTitle')}</div>
+              <div className="font-mono text-[11px] text-ink/80">{t('panel.completedDesc')}</div>
             </div>
-            <OfficialVerificationStamp label="SELESAI" sublabel="PEMKOT SBY" />
+            <OfficialVerificationStamp label={t('panel.completedStampLabel')} sublabel={t('panel.completedStampSub')} />
           </div>
         )}
 
@@ -155,10 +157,10 @@ const ReportDetailPanel: React.FC = () => {
 
         {/* Coordinates Box */}
         <div className="p-3 bg-paper-white border border-ink font-mono text-xs space-y-1.5">
-          <div className="flex items-center justify-between text-ink/70">
+          <div className="flex items-center justify-between text-ink/80">
             <span className="flex items-center gap-1.5">
               <IconMapPin className="w-3.5 h-3.5 text-ink" />
-              <span>GEOLOKASI:</span>
+              <span>{t('panel.geoLabel')}</span>
             </span>
             <span className="text-ink font-bold">
               [{report.longitude.toFixed(5)}, {report.latitude.toFixed(5)}]
@@ -171,7 +173,7 @@ const ReportDetailPanel: React.FC = () => {
           )}
           {report.kelurahan && (
             <div className="text-ink/80 text-[11px] font-sans">
-              Kelurahan: <span className="text-ink font-semibold">{report.kelurahan.name}</span>, Kec.{' '}
+              {t('panel.kelurahanLabel')} <span className="text-ink font-semibold">{report.kelurahan.name}</span>, Kec.{' '}
               <span className="text-ink font-semibold">{report.kelurahan.kecamatan}</span>
             </div>
           )}
@@ -181,7 +183,7 @@ const ReportDetailPanel: React.FC = () => {
         <div className="p-3 bg-paper-kraft/30 border border-ink space-y-1.5">
           <div className="flex items-center gap-1.5 text-ink font-sans font-bold text-xs uppercase tracking-wider">
             <IconFileText className="w-3.5 h-3.5" />
-            <span>Deskripsi Laporan:</span>
+            <span>{t('panel.descLabel')}</span>
           </div>
           <p className="text-ink text-xs leading-relaxed whitespace-pre-wrap font-sans">
             {report.description}
@@ -192,7 +194,7 @@ const ReportDetailPanel: React.FC = () => {
         {report.urgensiKeywords && report.urgensiKeywords.length > 0 && (
           <div className="p-3 bg-paper-white border border-ink space-y-1.5">
             <span className="text-ink/80 font-sans font-semibold text-xs">
-              Kata Kunci Urgensi Terdeteksi:
+              {t('panel.keywordsLabel')}
             </span>
             <div className="flex flex-wrap gap-1.5">
               {report.urgensiKeywords.map((kw, i) => (
@@ -212,8 +214,8 @@ const ReportDetailPanel: React.FC = () => {
           <div className="flex items-center gap-2">
             <Avatar name={report.user?.name || 'Warga'} size="sm" />
             <div>
-              <div className="text-ink font-semibold text-xs">{report.user?.name || 'Warga Anonim'}</div>
-              <div className="text-ink/60 text-[10px] font-mono">PELAPOR TERDAFTAR</div>
+              <div className="text-ink font-semibold text-xs">{report.user?.name || t('panel.anonymousReporter')}</div>
+              <div className="text-ink/70 text-[10px] font-mono">{t('panel.reporterLabel')}</div>
             </div>
           </div>
           <div className="text-right">
@@ -232,7 +234,7 @@ const ReportDetailPanel: React.FC = () => {
           <div className="p-3 bg-paper-kraft border border-ink space-y-2 mt-4">
             <div className="flex items-center gap-1.5 text-ink font-sans font-bold text-xs uppercase tracking-wider">
               <IconAlertTriangle className="w-3.5 h-3.5" />
-              <span>Tindakan Petugas:</span>
+              <span>{t('panel.officerActions')}</span>
             </div>
 
             {!showStatusForm ? (
@@ -254,7 +256,7 @@ const ReportDetailPanel: React.FC = () => {
                         : 'bg-stamp-red text-paper-white hover:opacity-90'
                     )}
                   >
-                    Ubah ke {status}
+                    {t('panel.changeTo')} {t(`status.${status}` as any)}
                   </button>
                 ))}
               </div>
@@ -262,7 +264,7 @@ const ReportDetailPanel: React.FC = () => {
               <div className="space-y-2">
                 <input
                   type="text"
-                  placeholder="Catatan penanganan petugas (opsional)..."
+                  placeholder={t('panel.notePlaceholder')}
                   value={noteInput}
                   onChange={(e) => setNoteInput(e.target.value)}
                   className="input-paper text-xs"
@@ -274,14 +276,14 @@ const ReportDetailPanel: React.FC = () => {
                     disabled={isUpdatingStatus}
                     className="btn-paper-primary flex-1 text-xs py-1.5"
                   >
-                    {isUpdatingStatus ? 'Menyimpan...' : `Konfirmasi ${pendingStatus}`}
+                    {isUpdatingStatus ? t('panel.saving') : `${t('panel.confirmStatus')} ${pendingStatus ? t(`status.${pendingStatus}` as any) : ''}`}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowStatusForm(false)}
                     className="btn-paper-secondary text-xs py-1.5 px-3"
                   >
-                    Batal
+                    {t('common.cancel')}
                   </button>
                 </div>
               </div>

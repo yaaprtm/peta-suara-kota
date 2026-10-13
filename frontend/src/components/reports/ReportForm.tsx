@@ -23,6 +23,7 @@ import { reportsApi } from '../../lib/api';
 import { useReportsStore } from '../../stores/reportsStore';
 import { useAuthStore } from '../../stores/authStore';
 import { fetchKecamatanGeoJSON, findKecamatanByCoordinate } from '../../lib/kecamatan';
+import { useTranslation } from '../../i18n/useTranslation';
 
 interface ReportFormProps {
   onClose?: () => void;
@@ -66,6 +67,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
 }) => {
   const { addReport } = useReportsStore();
   const { user } = useAuthStore();
+  const { t } = useTranslation();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -130,9 +132,9 @@ const ReportForm: React.FC<ReportFormProps> = ({
 
       mediaRecorder.start();
       setIsRecording(true);
-      toast.success('Rekaman suara aktif. Silakan berbicara...');
+      toast.success(t('reportForm.toastRecordingStart'));
     } catch {
-      toast.error('Tidak dapat mengakses mikrofon');
+      toast.error(t('reportForm.toastMicError'));
     }
   };
 
@@ -141,18 +143,18 @@ const ReportForm: React.FC<ReportFormProps> = ({
       mediaRecorderRef.current.stop();
       recognitionRef.current?.stop();
       setIsRecording(false);
-      toast.success('Rekaman suara selesai');
+      toast.success(t('reportForm.toastRecordingStop'));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      toast.error('Judul laporan wajib diisi');
+      toast.error(t('reportForm.toastTitleRequired'));
       return;
     }
     if (!description.trim()) {
-      toast.error('Deskripsi kronologi masalah wajib diisi');
+      toast.error(t('reportForm.toastDescRequired'));
       return;
     }
 
@@ -221,9 +223,9 @@ const ReportForm: React.FC<ReportFormProps> = ({
       }
 
       setStep('success');
-      toast.success('Laporan pengaduan berhasil dikirim!');
+      toast.success(t('reportForm.toastSuccess'));
     } catch (err: any) {
-      toast.error(err?.message || 'Gagal mengirim laporan');
+      toast.error(err?.message || t('reportForm.toastFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -236,21 +238,14 @@ const ReportForm: React.FC<ReportFormProps> = ({
           <IconCheck className="w-8 h-8" />
         </div>
         <div>
-          <h3 className="font-bold text-base text-navy">
-            Matur Nuwun! Laporan Berhasil Dikirim
-          </h3>
-          <p className="text-xs text-slate-500 max-w-sm mt-1">
-            Pengaduanmu telah tercatat di antrean Command Center Surabaya. Petugas dan dinas terkait akan segera menindaklanjuti.
-          </p>
+          <h3 className="font-bold text-base text-navy">{t('reportForm.successTitle')}</h3>
+          <p className="text-xs text-slate-500 max-w-sm mt-1">{t('reportForm.successDesc')}</p>
         </div>
         <button
-          onClick={() => {
-            if (onSuccess) onSuccess();
-            handleClose();
-          }}
+          onClick={() => { if (onSuccess) onSuccess(); handleClose(); }}
           className="btn-navy w-full py-2.5 text-xs font-semibold"
         >
-          Lihat di Dashboard Warga
+          {t('reportForm.successBtn')}
         </button>
       </div>
     );
@@ -258,31 +253,23 @@ const ReportForm: React.FC<ReportFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-5 space-y-4 text-xs font-sans text-slate-800">
-      {/* Header Form */}
+      {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-1.5 text-[10px] text-orange font-bold uppercase tracking-wider">
             <IconBuildingCommunity className="w-3.5 h-3.5" />
-            <span>KOTA SURABAYA · FORMULIR PENGADUAN WARGA</span>
+            <span>{t('reportForm.headerLabel')}</span>
           </div>
-          <h2 className="font-bold text-sm text-navy mt-0.5">
-            Buat Laporan / Keluhan Baru
-          </h2>
+          <h2 className="font-bold text-sm text-navy mt-0.5">{t('reportForm.headerTitle')}</h2>
         </div>
-        <button
-          type="button"
-          onClick={handleClose}
-          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
-        >
+        <button type="button" onClick={handleClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
           <IconX className="w-5 h-5" />
         </button>
       </div>
 
-      {/* 01: Kategori Gangguan */}
+      {/* Step 1: Category */}
       <div>
-        <label className="font-semibold text-slate-700 block mb-1.5 text-xs">
-          1. Pilih Kategori Masalah
-        </label>
+        <label className="font-semibold text-slate-700 block mb-1.5 text-xs">{t('reportForm.step1Label')}</label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
           {CATEGORIES.map((cat) => {
             const isSelected = category === cat;
@@ -293,39 +280,33 @@ const ReportForm: React.FC<ReportFormProps> = ({
                 onClick={() => setCategory(cat)}
                 className={clsx(
                   'px-2.5 py-2 rounded-lg border text-left flex items-center gap-2 transition-all text-xs font-medium',
-                  isSelected
-                    ? 'bg-navy text-white border-navy font-bold shadow-xs'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  isSelected ? 'bg-navy text-white border-navy font-bold shadow-xs' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                 )}
               >
                 {CATEGORY_ICON_MAP[cat]}
-                <span className="truncate">{CATEGORY_LABELS[cat]}</span>
+                <span className="truncate">{t(`category.${cat}` as any)}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 02: Judul Singkat */}
+      {/* Step 2: Title */}
       <div>
-        <label className="font-semibold text-slate-700 block mb-1 text-xs">
-          2. Judul Laporan Singkat
-        </label>
+        <label className="font-semibold text-slate-700 block mb-1 text-xs">{t('reportForm.step2Label')}</label>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Contoh: Aspal berlubang parah depan Balai RW..."
+          placeholder={t('reportForm.step2Placeholder')}
           className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy"
           required
         />
       </div>
 
-      {/* 03: Pilih Wilayah & Titik Lokasi */}
+      {/* Step 3: District */}
       <div>
-        <label className="font-semibold text-slate-700 block mb-1 text-xs">
-          3. Wilayah Kecamatan di Surabaya
-        </label>
+        <label className="font-semibold text-slate-700 block mb-1 text-xs">{t('reportForm.step3Label')}</label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <select
             value={selectedDistrict.name}
@@ -337,82 +318,69 @@ const ReportForm: React.FC<ReportFormProps> = ({
           >
             {SURABAYA_DISTRICTS.map((d) => (
               <option key={d.name} value={d.name}>
-                Kecamatan {d.name}
+                {t('reportForm.step3DistrictPrefix')} {d.name}
               </option>
             ))}
           </select>
-
           <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 flex items-center justify-between text-[11px] text-slate-600 font-mono">
-            <span>
-              Lat: {activeLocation.lat.toFixed(4)}, Lng: {activeLocation.lng.toFixed(4)}
-            </span>
+            <span>Lat: {activeLocation.lat.toFixed(4)}, Lng: {activeLocation.lng.toFixed(4)}</span>
             <IconMapPin className="w-3.5 h-3.5 text-orange shrink-0" />
           </div>
         </div>
       </div>
 
-      {/* 04: Deskripsi & Rekam Suara */}
+      {/* Step 4: Description + Voice */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="font-semibold text-slate-700 text-xs">
-            4. Detail Kronologi Masalah
-          </label>
+          <label className="font-semibold text-slate-700 text-xs">{t('reportForm.step4Label')}</label>
           <button
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
             className={clsx(
               'px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all',
-              isRecording
-                ? 'bg-red-600 text-white animate-pulse'
-                : 'bg-orange-50 text-orange-800 border border-orange-200 hover:bg-orange-100'
+              isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-orange-50 text-orange-800 border border-orange-200 hover:bg-orange-100'
             )}
           >
             {isRecording ? <IconMicrophoneOff className="w-3.5 h-3.5" /> : <IconMicrophone className="w-3.5 h-3.5" />}
-            <span>{isRecording ? 'Hentikan Rekam' : 'Rekam Suara'}</span>
+            <span>{isRecording ? t('reportForm.stopRecording') : t('reportForm.startRecording')}</span>
           </button>
         </div>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Ceritakan permasalahan secara jelas dan lengkap..."
+          placeholder={t('reportForm.step4Placeholder')}
           rows={3}
           className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy resize-none"
           required
         />
       </div>
 
-      {/* 05: Alamat Patokan */}
+      {/* Step 5: Address */}
       <div>
-        <label className="font-semibold text-slate-700 block mb-1 text-xs">
-          5. Alamat / Patokan Khusus (Opsional)
-        </label>
+        <label className="font-semibold text-slate-700 block mb-1 text-xs">{t('reportForm.step5Label')}</label>
         <input
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="Contoh: Jl. Dharmawangsa No. 12, seberang masjid..."
+          placeholder={t('reportForm.step5Placeholder')}
           className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy"
         />
       </div>
 
-      {/* 06: Lampiran Foto */}
+      {/* Step 6: Photos */}
       <div>
-        <label className="font-semibold text-slate-700 block mb-1 text-xs">
-          6. Foto Bukti Lapangan (Maks. 4 Foto)
-        </label>
+        <label className="font-semibold text-slate-700 block mb-1 text-xs">{t('reportForm.step6Label')}</label>
         <div
           {...getRootProps()}
           className={clsx(
             'border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-all',
-            isDragActive
-              ? 'border-navy bg-navy-50'
-              : 'border-slate-300 hover:border-navy bg-slate-50'
+            isDragActive ? 'border-navy bg-navy-50' : 'border-slate-300 hover:border-navy bg-slate-50'
           )}
         >
           <input {...getInputProps()} />
           <IconUpload className="w-4 h-4 mx-auto text-slate-400 mb-1" />
           <p className="text-slate-500 text-[11px]">
-            {isDragActive ? 'Lepaskan foto di sini' : 'Klik atau seret foto bukti ke sini'}
+            {isDragActive ? t('reportForm.dropActive') : t('reportForm.dropIdle')}
           </p>
         </div>
         {photos.length > 0 && (
@@ -424,7 +392,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                   type="button"
                   onClick={() => setPhotos((prev) => prev.filter((_, i) => i !== idx))}
                   className="absolute top-1 right-1 bg-red-600 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center"
-                  title="Hapus foto"
+                  title={t('reportForm.removePhoto')}
                 >
                   <IconX className="w-3 h-3" />
                 </button>
@@ -444,21 +412,17 @@ const ReportForm: React.FC<ReportFormProps> = ({
           {isSubmitting ? (
             <>
               <IconLoader2 className="w-4 h-4 animate-spin text-orange" />
-              <span>Mengirim Laporan...</span>
+              <span>{t('reportForm.submitting')}</span>
             </>
           ) : (
             <>
               <IconSend className="w-4 h-4 text-orange" />
-              <span>Kirim Pengaduan Sekarang</span>
+              <span>{t('reportForm.submitBtn')}</span>
             </>
           )}
         </button>
-        <button
-          type="button"
-          onClick={handleClose}
-          className="btn-outline px-4 text-xs font-medium"
-        >
-          Batal
+        <button type="button" onClick={handleClose} className="btn-outline px-4 text-xs font-medium">
+          {t('common.cancel')}
         </button>
       </div>
     </form>

@@ -54,7 +54,7 @@ const PageLoader: React.FC = () => (
       </div>
       <LoadingSpinner size="md" />
       <p className="font-semibold text-xs tracking-wider text-navy uppercase">
-        Memuat Peta Suara Kota Surabaya...
+        Peta Suara Kota Surabaya...
       </p>
     </div>
   </div>

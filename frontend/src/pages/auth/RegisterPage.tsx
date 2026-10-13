@@ -7,24 +7,27 @@ import {
 } from '@tabler/icons-react';
 import { useAuthStore } from '../../stores/authStore';
 import toast from 'react-hot-toast';
+import { useTranslation } from '../../i18n/useTranslation';
+import LanguageToggle from '../../components/ui/LanguageToggle';
 
 const RegisterPage: React.FC = () => {
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
   const { register, isLoading } = useAuthStore();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.password.length < 6) {
-      toast.error('Kata sandi minimal 6 karakter');
+      toast.error(t('auth.passwordTooShort'));
       return;
     }
     try {
       await register({ name: form.name, email: form.email, password: form.password, phone: form.phone || undefined });
-      toast.success('Pendaftaran akun berhasil! Selamat datang di Dashboard Warga.');
+      toast.success(t('auth.registerSuccess'));
       navigate('/dashboard');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Pendaftaran gagal';
+      const msg = err instanceof Error ? err.message : t('auth.registerFailed');
       toast.error(msg);
     }
   };
@@ -35,15 +38,16 @@ const RegisterPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
       <div className="w-full max-w-md relative">
-        {/* Back Link */}
-        <div className="mb-4">
+        {/* Back + Language toggle row */}
+        <div className="mb-4 flex items-center justify-between">
           <button
             onClick={() => navigate('/')}
             className="btn-outline text-xs inline-flex items-center gap-1.5"
           >
             <IconArrowLeft className="w-3.5 h-3.5 text-navy" />
-            <span>Kembali ke Beranda Publik</span>
+            <span>{t('common.backToHome')}</span>
           </button>
+          <LanguageToggle />
         </div>
 
         {/* Register Card */}
@@ -54,24 +58,24 @@ const RegisterPage: React.FC = () => {
               <IconBuildingCommunity className="w-6 h-6 text-orange" />
             </div>
             <h1 className="font-bold text-lg text-navy tracking-tight">
-              Peta Suara Kota Surabaya
+              {t('auth.registerTitle')}
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              Registrasi Akun Warga Pelapor
+              {t('auth.registerSubtitle')}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
               <label className="font-semibold text-slate-700 block mb-1.5" htmlFor="reg-name">
-                Nama Lengkap Warga
+                {t('auth.nameLabel')}
               </label>
               <input
                 id="reg-name"
                 type="text"
                 value={form.name}
                 onChange={set('name')}
-                placeholder="Contoh: Budi Santoso"
+                placeholder={t('auth.namePlaceholder')}
                 className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
                 required
                 minLength={2}
@@ -80,14 +84,14 @@ const RegisterPage: React.FC = () => {
 
             <div>
               <label className="font-semibold text-slate-700 block mb-1.5" htmlFor="reg-email">
-                Alamat Email
+                {t('auth.emailRegLabel')}
               </label>
               <input
                 id="reg-email"
                 type="email"
                 value={form.email}
                 onChange={set('email')}
-                placeholder="nama@domain.id"
+                placeholder={t('auth.emailRegPlaceholder')}
                 className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
                 required
               />
@@ -95,28 +99,28 @@ const RegisterPage: React.FC = () => {
 
             <div>
               <label className="font-semibold text-slate-700 block mb-1.5" htmlFor="reg-phone">
-                Nomor Telepon / WhatsApp (Opsional)
+                {t('auth.phoneLabel')}
               </label>
               <input
                 id="reg-phone"
                 type="tel"
                 value={form.phone}
                 onChange={set('phone')}
-                placeholder="081234567890"
+                placeholder={t('auth.phonePlaceholder')}
                 className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
               />
             </div>
 
             <div>
               <label className="font-semibold text-slate-700 block mb-1.5" htmlFor="reg-password">
-                Kata Sandi (Minimal 6 Karakter)
+                {t('auth.passwordRegLabel')}
               </label>
               <input
                 id="reg-password"
                 type="password"
                 value={form.password}
                 onChange={set('password')}
-                placeholder="••••••••"
+                placeholder={t('auth.passwordPlaceholder')}
                 className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy"
                 required
                 minLength={6}
@@ -131,18 +135,16 @@ const RegisterPage: React.FC = () => {
               {isLoading ? (
                 <>
                   <IconLoader2 className="w-4 h-4 animate-spin text-orange" />
-                  <span>Mendaftarkan akun...</span>
+                  <span>{t('auth.registering')}</span>
                 </>
-              ) : (
-                'Daftar Sekarang'
-              )}
+              ) : t('auth.registerBtn')}
             </button>
           </form>
 
           <p className="text-center text-xs text-slate-500 mt-5">
-            Sudah terdaftar?{' '}
+            {t('auth.alreadyHaveAccount')}{' '}
             <Link to="/login" className="font-bold text-navy hover:text-orange underline">
-              Masuk ke akun terdaftar
+              {t('auth.loginLink')}
             </Link>
           </p>
         </div>

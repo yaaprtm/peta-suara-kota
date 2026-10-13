@@ -31,6 +31,7 @@
   --paper-white: #FFFFFF;
   --paper-card: #FFFFFF;
   --paper-kraft: #F1F5F9;
+  --board-bg: #F8FAFC;
   --ink: #10213A;
   --ink-dim: #4A5B73;
   --ink-muted: #7C8BA1;
@@ -38,6 +39,9 @@
   --border-subtle: #F1F5F9;
   --severity-critical: #DC2626;
   --severity-high: #EA580C;
+  /* Stamp colours used in ReportDetailPanel action buttons */
+  --stamp-red: #C0392B;
+  --mustard: #D97706;
 }
 
 *, *::before, *::after {

@@ -62,11 +62,45 @@ export default {
           banjir: '#0284C7',
           lainnya: '#4A5B73',
         },
+
+        // ── Paper / Newspaper design system tokens ──────────────────────────
+        // Used throughout MapPage and ReportDetailPanel with the "paper" theme
+        'paper-bg':    '#FFFFFF',
+        'paper-white': '#FFFFFF',
+        'paper-card':  '#FFFFFF',
+        'paper-kraft': '#F1F5F9',
+        'board-bg':    '#F8FAFC',
+
+        // Ink colours (newspaper text)
+        'ink': {
+          DEFAULT: '#10213A',
+          dim:     '#4A5B73',
+          muted:   '#7C8BA1',
+          subtle:  '#94A3B8',
+          border:  '#E2E8F0',
+        },
+
+        // Border tokens used with CSS variables
+        'border-paper':  '#E2E8F0',
+        'border-subtle': '#F1F5F9',
+
+        // Stamp colours (used in ReportDetailPanel action buttons)
+        'stamp-red': '#C0392B',
+        'mustard':   '#D97706',
+
+        // Severity (used in sidebar section headers)
+        'severity-critical': '#DC2626',
+        'severity-high':     '#EA580C',
       },
       fontFamily: {
-        sans: ['"Inter"', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans:    ['"Inter"', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         display: ['"Inter"', 'sans-serif'],
-        mono: ['"Courier Prime"', 'monospace'],
+        mono:    ['"Courier Prime"', '"Courier New"', 'Courier', 'monospace'],
+        // serif used for the MapPage newspaper-style wordmark
+        serif:   ['"Playfair Display"', 'Georgia', 'Cambria', '"Times New Roman"', 'serif'],
+      },
+      borderWidth: {
+        '3': '3px',
       },
       boxShadow: {
         card: '0 1px 3px 0 rgba(16, 33, 58, 0.06), 0 1px 2px -1px rgba(16, 33, 58, 0.04)',

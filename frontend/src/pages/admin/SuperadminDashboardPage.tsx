@@ -24,6 +24,8 @@ import { useAuthStore } from '../../stores/authStore';
 import { useReportsStore } from '../../stores/reportsStore';
 import { User, UserRole } from '../../types';
 import { UrgencyBadge, StatusBadge, CategoryBadge, Avatar } from '../../components/ui/Badges';
+import { LanguageToggleDark } from '../../components/ui/LanguageToggle';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // Mock list of registered accounts for testing & admin management
 const INITIAL_USERS: User[] = [
@@ -39,6 +41,7 @@ const SuperadminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { reports } = useReportsStore();
+  const { t } = useTranslation();
 
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [userSearch, setUserSearch] = useState('');
@@ -63,12 +66,12 @@ const SuperadminDashboardPage: React.FC = () => {
 
   const handleToggleUserStatus = (userId: string) => {
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: !u.isActive } : u));
-    toast.success('Status keaktifan pengguna diperbarui');
+    toast.success(t('superadmin.toastStatusUpdated'));
   };
 
   const handleChangeRole = (userId: string, newRole: UserRole) => {
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-    toast.success(`Role pengguna diubah menjadi: ${newRole}`);
+    toast.success(t('superadmin.toastRoleUpdated', { role: newRole }));
   };
 
   return (
@@ -83,25 +86,26 @@ const SuperadminDashboardPage: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-sm sm:text-base text-white tracking-tight leading-none">
-                  PANEL SUPERADMIN KOTA SURABAYA
+                  {t('superadmin.headerTitle')}
                 </h1>
                 <span className="bg-purple-900/60 text-purple-200 border border-purple-500/30 text-[10px] font-semibold px-1.5 py-0.5 rounded">
-                  PUSAT KONTROL
+                  {t('superadmin.controlTag')}
                 </span>
               </div>
               <p className="text-[11px] text-slate-300 mt-0.5">
-                Pengguna: <b className="text-white">{user?.name || 'Superadmin'}</b> · Hak Akses Penuh Kota
+                {t('superadmin.headerSubtitle', { name: user?.name || 'Superadmin' })}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            <LanguageToggleDark />
             <Link
               to="/superadmin/master"
               className="bg-orange hover:bg-orange-600 text-navy-900 font-semibold px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 shadow-sm"
             >
               <IconDatabase className="w-4 h-4" />
-              <span>Kelola Master Data</span>
+              <span className="hidden sm:inline">{t('superadmin.masterDataBtn')}</span>
             </Link>
           </div>
         </div>
@@ -115,88 +119,80 @@ const SuperadminDashboardPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <IconChartBar className="w-4 h-4 text-orange" />
               <h2 className="font-bold text-navy text-sm uppercase tracking-wider">
-                Statistik Seluruh Kota Surabaya
+                {t('superadmin.statsTitle')}
               </h2>
             </div>
-            <span className="text-xs text-slate-400 font-mono">Data Terintegrasi</span>
+            <span className="text-xs text-slate-400 font-mono">{t('superadmin.statsSubtitle')}</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-1">TOTAL PENGADUAN</span>
+              <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statTotal')}</span>
               <div className="flex items-baseline justify-between">
                 <span className="text-2xl font-bold text-navy">{totalReports}</span>
                 <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                  100% Aktif
+                  {t('superadmin.statTotalBadge')}
                 </span>
               </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">Semua laporan dari warga kota</span>
+              <span className="text-[11px] text-slate-500 mt-1 block">{t('superadmin.statTotalDesc')}</span>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-1">TINGKAT PENYELESAIAN</span>
+              <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statResolution')}</span>
               <div className="flex items-baseline justify-between">
                 <span className="text-2xl font-bold text-emerald-600">{resolutionRate}%</span>
-                <span className="text-xs text-slate-500">{completedReports}/{totalReports} Selesai</span>
+                <span className="text-xs text-slate-500">{t('superadmin.statResolutionSub', { done: completedReports, total: totalReports })}</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-                <div
-                  className="bg-emerald-500 h-1.5 rounded-full transition-all"
-                  style={{ width: `${resolutionRate}%` }}
-                />
+                <div className="bg-emerald-500 h-1.5 rounded-full transition-all" style={{ width: `${resolutionRate}%` }} />
               </div>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-1">URGENSI KRITIS</span>
+              <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statCritical')}</span>
               <div className="flex items-baseline justify-between">
                 <span className="text-2xl font-bold text-red-600">{criticalCount}</span>
                 <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full font-semibold">
-                  Prioritas 1
+                  {t('superadmin.statCriticalBadge')}
                 </span>
               </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">Skor urgensi &gt; 80 poin</span>
+              <span className="text-[11px] text-slate-500 mt-1 block">{t('superadmin.statCriticalDesc')}</span>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-1">TOTAL AKUN PENGGUNA</span>
+              <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statUsers')}</span>
               <div className="flex items-baseline justify-between">
                 <span className="text-2xl font-bold text-navy">{totalUsers}</span>
                 <span className="text-xs text-navy bg-navy-50 px-2 py-0.5 rounded-full font-semibold">
-                  Warga & Petugas
+                  {t('superadmin.statUsersBadge')}
                 </span>
               </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">Terdaftar resmi di database</span>
+              <span className="text-[11px] text-slate-500 mt-1 block">{t('superadmin.statUsersDesc')}</span>
             </div>
           </div>
         </section>
 
-        {/* Section 2: Banner Navigasi ke Master Data */}
+        {/* Section 2: Banner Master Data */}
         <section className="bg-gradient-to-r from-navy to-navy-800 rounded-xl p-5 text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <IconDatabase className="w-5 h-5 text-orange" />
-              <h3 className="font-bold text-base text-white">Kelola Master Data Sistem</h3>
+              <h3 className="font-bold text-base text-white">{t('superadmin.masterBannerTitle')}</h3>
             </div>
-            <p className="text-xs text-slate-300 max-w-xl">
-              Konfigurasi Master Kategori Laporan, Bobot Base Score, Level Urgensi (Kritis, Tinggi, Sedang, Rendah), dan penetapan Role Akun.
-            </p>
+            <p className="text-xs text-slate-300 max-w-xl">{t('superadmin.masterBannerDesc')}</p>
           </div>
-          <Link
-            to="/superadmin/master"
-            className="btn-orange py-2 px-4 text-xs font-semibold whitespace-nowrap self-start sm:self-auto"
-          >
-            Buka Kelola Master Data &rarr;
+          <Link to="/superadmin/master" className="btn-orange py-2 px-4 text-xs font-semibold whitespace-nowrap self-start sm:self-auto">
+            {t('superadmin.masterBannerBtn')}
           </Link>
         </section>
 
-        {/* Section 3: Kelola Akun Warga dan Petugas */}
+        {/* Section 3: User Management */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <IconUsers className="w-4 h-4 text-orange" />
               <h2 className="font-bold text-navy text-sm uppercase tracking-wider">
-                Kelola Akun Warga dan Petugas ({filteredUsers.length})
+                {t('superadmin.usersTitle', { count: filteredUsers.length })}
               </h2>
             </div>
 
@@ -207,7 +203,7 @@ const SuperadminDashboardPage: React.FC = () => {
                   type="text"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  placeholder="Cari nama / email akun..."
+                  placeholder={t('superadmin.usersSearch')}
                   className="pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-xs w-48 sm:w-60 focus:outline-none focus:border-navy"
                 />
               </div>
@@ -217,10 +213,10 @@ const SuperadminDashboardPage: React.FC = () => {
                 onChange={(e) => setRoleFilter(e.target.value as any)}
                 className="py-1.5 px-2.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-700 bg-white"
               >
-                <option value="ALL">Semua Peran</option>
-                <option value="WARGA">Warga</option>
-                <option value="PETUGAS">Petugas</option>
-                <option value="SUPERADMIN">Superadmin</option>
+                <option value="ALL">{t('common.allRoles')}</option>
+                <option value="WARGA">{t('roles.WARGA')}</option>
+                <option value="PETUGAS">{t('roles.PETUGAS')}</option>
+                <option value="SUPERADMIN">{t('roles.SUPERADMIN')}</option>
               </select>
             </div>
           </div>
@@ -229,11 +225,11 @@ const SuperadminDashboardPage: React.FC = () => {
             <table className="w-full text-left text-xs min-w-[550px]">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                 <tr>
-                  <th className="p-3">Nama & Email</th>
-                  <th className="p-3">Peran (Role)</th>
-                  <th className="p-3">Telepon</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Aksi Kelola</th>
+                  <th className="p-3">{t('superadmin.colName')}</th>
+                  <th className="p-3">{t('superadmin.colRole')}</th>
+                  <th className="p-3">{t('superadmin.colPhone')}</th>
+                  <th className="p-3">{t('superadmin.colStatus')}</th>
+                  <th className="p-3 text-right">{t('superadmin.colActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -267,18 +263,14 @@ const SuperadminDashboardPage: React.FC = () => {
                       </select>
                     </td>
 
-                    <td className="p-3 font-mono text-[11px] text-slate-500">
-                      {u.phone || '-'}
-                    </td>
+                    <td className="p-3 font-mono text-[11px] text-slate-500">{u.phone || '-'}</td>
 
                     <td className="p-3">
                       <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                        u.isActive
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                        u.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
                       }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                        {u.isActive ? 'Aktif' : 'Nonaktif'}
+                        {u.isActive ? t('superadmin.statusActive') : t('superadmin.statusInactive')}
                       </span>
                     </td>
 
@@ -286,12 +278,10 @@ const SuperadminDashboardPage: React.FC = () => {
                       <button
                         onClick={() => handleToggleUserStatus(u.id)}
                         className={`px-2.5 py-1 rounded text-[11px] font-medium border transition-colors ${
-                          u.isActive
-                            ? 'border-rose-200 text-rose-600 hover:bg-rose-50'
-                            : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                          u.isActive ? 'border-rose-200 text-rose-600 hover:bg-rose-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
                         }`}
                       >
-                        {u.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                        {u.isActive ? t('superadmin.deactivate') : t('superadmin.activate')}
                       </button>
                     </td>
                   </tr>
@@ -301,16 +291,16 @@ const SuperadminDashboardPage: React.FC = () => {
           </div>
         </section>
 
-        {/* Section 4: Log Aktivitas Sistem */}
+        {/* Section 4: Activity Log */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <IconHistory className="w-4 h-4 text-orange" />
               <h2 className="font-bold text-navy text-sm uppercase tracking-wider">
-                Log Aktivitas Operasional Kota
+                {t('superadmin.logTitle')}
               </h2>
             </div>
-            <span className="text-[11px] text-slate-400">Jejak Audit Realtime</span>
+            <span className="text-[11px] text-slate-400">{t('superadmin.logSubtitle')}</span>
           </div>
 
           <div className="space-y-3">
@@ -322,14 +312,13 @@ const SuperadminDashboardPage: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-slate-800 font-medium">
-                      Status laporan <span className="font-bold text-navy">"{r.title}"</span> di wilayah {r.kelurahan?.name || r.kecamatan || 'Surabaya'} tercatat <b className="text-navy">{r.status}</b>.
+                      {t('superadmin.logText', { title: r.title, area: r.kelurahan?.name || r.kecamatan || 'Surabaya', status: r.status })}
                     </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                      Skor Urgensi: {r.skorUrgensi} · Pelapor: {r.user?.name || 'Warga'}
+                    <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                      {t('superadmin.logMeta', { score: r.skorUrgensi, reporter: r.user?.name || 'Warga' })}
                     </p>
                   </div>
                 </div>
-
                 <span className="text-[10px] text-slate-400 whitespace-nowrap font-mono">
                   {format(parseISO(r.createdAt), 'dd/MM/yyyy HH:mm')}
                 </span>
