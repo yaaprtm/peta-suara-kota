@@ -171,10 +171,10 @@ const WargaDashboardPage: React.FC = () => {
 
         {/* Navigation Tabs */}
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-          <div className="border-b border-slate-200 px-4 flex items-center gap-6 text-xs font-semibold">
+          <div className="border-b border-slate-200 px-4 flex items-center gap-4 sm:gap-6 text-xs font-semibold overflow-x-auto whitespace-nowrap">
             <button
               onClick={() => setActiveTab('laporanku')}
-              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 ${
+              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 shrink-0 ${
                 activeTab === 'laporanku'
                   ? 'border-navy text-navy font-bold'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -186,7 +186,7 @@ const WargaDashboardPage: React.FC = () => {
 
             <button
               onClick={() => setActiveTab('peta')}
-              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 ${
+              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 shrink-0 ${
                 activeTab === 'peta'
                   ? 'border-navy text-navy font-bold'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -198,7 +198,7 @@ const WargaDashboardPage: React.FC = () => {
 
             <button
               onClick={() => setActiveTab('semua')}
-              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 ${
+              className={`py-3.5 border-b-2 transition-all flex items-center gap-2 shrink-0 ${
                 activeTab === 'semua'
                   ? 'border-navy text-navy font-bold'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -391,6 +391,7 @@ const WargaDashboardPage: React.FC = () => {
                 toast('Klik titik peta untuk memilih lokasi');
               }}
               pickedLocation={pickedLocation}
+              initialLocation={pickedLocation || { lat: -7.2754, lng: 112.7533 }}
             />
           </div>
         </div>

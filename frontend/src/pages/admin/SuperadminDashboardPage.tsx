@@ -226,7 +226,7 @@ const SuperadminDashboardPage: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs min-w-[550px]">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                 <tr>
                   <th className="p-3">Nama & Email</th>

@@ -13,6 +13,7 @@ import {
   IconDroplet,
   IconFileText,
   IconX,
+  IconBuildingCommunity,
 } from '@tabler/icons-react';
 import { useDropzone } from 'react-dropzone';
 import clsx from 'clsx';
@@ -27,7 +28,7 @@ interface ReportFormProps {
   onClose?: () => void;
   onCancel?: () => void;
   onSuccess?: () => void;
-  onPickLocation: () => void;
+  onPickLocation?: () => void;
   pickedLocation?: { lat: number; lng: number } | null;
   initialLocation?: { lat: number; lng: number } | null;
 }
@@ -35,36 +36,25 @@ interface ReportFormProps {
 const CATEGORIES = Object.values(ReportCategory) as ReportCategory[];
 
 const CATEGORY_ICON_MAP: Record<ReportCategory, React.ReactNode> = {
-  INFRASTRUKTUR: <IconTool className="w-4 h-4 shrink-0" stroke={1.5} />,
-  KEBERSIHAN: <IconTrash className="w-4 h-4 shrink-0" stroke={1.5} />,
-  KEAMANAN: <IconShieldExclamation className="w-4 h-4 shrink-0" stroke={1.5} />,
-  BANJIR: <IconDroplet className="w-4 h-4 shrink-0" stroke={1.5} />,
-  LAINNYA: <IconFileText className="w-4 h-4 shrink-0" stroke={1.5} />,
+  INFRASTRUKTUR: <IconTool className="w-4 h-4 shrink-0" />,
+  KEBERSIHAN: <IconTrash className="w-4 h-4 shrink-0" />,
+  KEAMANAN: <IconShieldExclamation className="w-4 h-4 shrink-0" />,
+  BANJIR: <IconDroplet className="w-4 h-4 shrink-0" />,
+  LAINNYA: <IconFileText className="w-4 h-4 shrink-0" />,
 };
 
-interface ISpeechRecognitionResult {
-  readonly 0: { transcript: string };
-}
-
-interface ISpeechRecognitionEvent {
-  results: ISpeechRecognitionResult[];
-}
-
-interface ISpeechRecognition {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: (event: ISpeechRecognitionEvent) => void;
-  start: () => void;
-  stop: () => void;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: new () => ISpeechRecognition;
-    webkitSpeechRecognition: new () => ISpeechRecognition;
-  }
-}
+// Preset kecamatan in Surabaya for 1-click location selection
+const SURABAYA_DISTRICTS = [
+  { name: 'Gubeng', lat: -7.2754, lng: 112.7533 },
+  { name: 'Genteng', lat: -7.2575, lng: 112.7483 },
+  { name: 'Tegalsari', lat: -7.2721, lng: 112.7381 },
+  { name: 'Wonokromo', lat: -7.2982, lng: 112.7386 },
+  { name: 'Rungkut', lat: -7.3228, lng: 112.7844 },
+  { name: 'Sawahan', lat: -7.2711, lng: 112.7214 },
+  { name: 'Kenjeran', lat: -7.2285, lng: 112.7812 },
+  { name: 'Sukolilo', lat: -7.2882, lng: 112.7981 },
+  { name: 'Tambaksari', lat: -7.2514, lng: 112.7661 },
+];
 
 const ReportForm: React.FC<ReportFormProps> = ({
   onClose,
@@ -74,7 +64,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
   pickedLocation,
   initialLocation,
 }) => {
-  const activeLocation = pickedLocation || initialLocation || null;
   const { addReport } = useReportsStore();
   const { user } = useAuthStore();
 
@@ -82,33 +71,18 @@ const ReportForm: React.FC<ReportFormProps> = ({
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<ReportCategory>('INFRASTRUKTUR');
   const [address, setAddress] = useState('');
-  const [detectedKecamatan, setDetectedKecamatan] = useState<string | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState(SURABAYA_DISTRICTS[0]);
   const [photos, setPhotos] = useState<File[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [audioTranscript, setAudioTranscript] = useState('');
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<'form' | 'success'>('form');
 
-  React.useEffect(() => {
-    if (!activeLocation) {
-      setDetectedKecamatan(null);
-      return;
-    }
-    fetchKecamatanGeoJSON().then((geojson) => {
-      const match = findKecamatanByCoordinate(activeLocation.lng, activeLocation.lat, geojson);
-      if (match) {
-        setDetectedKecamatan(match.name);
-      } else {
-        setDetectedKecamatan(null);
-        toast.error('Lokasi berada di luar cakupan batas wilayah Kota Surabaya.');
-      }
-    });
-  }, [activeLocation]);
+  // Active coordinates
+  const activeLocation = pickedLocation || initialLocation || { lat: selectedDistrict.lat, lng: selectedDistrict.lng };
 
-  const recognitionRef = useRef<ISpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   const handleClose = () => {
     if (onClose) onClose();
@@ -133,31 +107,18 @@ const ReportForm: React.FC<ReportFormProps> = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
-      audioChunksRef.current = [];
       mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = (e) => {
-        audioChunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(blob);
-        stream.getTracks().forEach((t) => t.stop());
-      };
-
-      mediaRecorder.start();
-
-      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRec) {
         const recognition = new SpeechRec();
         recognition.lang = 'id-ID';
         recognition.continuous = true;
         recognition.interimResults = true;
 
-        recognition.onresult = (e: ISpeechRecognitionEvent) => {
+        recognition.onresult = (e: any) => {
           const current = Array.from(e.results)
-            .map((r) => r[0].transcript)
+            .map((r: any) => r[0].transcript)
             .join(' ');
           setAudioTranscript(current);
           setDescription((prev) => (prev ? `${prev} ${current}` : current));
@@ -167,8 +128,9 @@ const ReportForm: React.FC<ReportFormProps> = ({
         recognition.start();
       }
 
+      mediaRecorder.start();
       setIsRecording(true);
-      toast.success('Rekaman aktif. Silakan berbicara, Cak/Ning…');
+      toast.success('Rekaman suara aktif. Silakan berbicara...');
     } catch {
       toast.error('Tidak dapat mengakses mikrofon');
     }
@@ -179,33 +141,24 @@ const ReportForm: React.FC<ReportFormProps> = ({
       mediaRecorderRef.current.stop();
       recognitionRef.current?.stop();
       setIsRecording(false);
-      toast.success('Rekaman suara wes selesai');
+      toast.success('Rekaman suara selesai');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      toast.error('Judul perihal wajib diisi, Cak/Ning');
+      toast.error('Judul laporan wajib diisi');
       return;
     }
     if (!description.trim()) {
-      toast.error('Deskripsi kronologi wajib diisi ya');
-      return;
-    }
-    if (!activeLocation) {
-      toast.error('Pilih titik lokasi dulu di peta');
-      return;
-    }
-
-    const geojson = await fetchKecamatanGeoJSON();
-    const kecMatch = findKecamatanByCoordinate(activeLocation.lng, activeLocation.lat, geojson);
-    if (!kecMatch) {
-      toast.error('Titik koordinat berada di luar cakupan wilayah Surabaya. Silakan pilih titik lokasi di dalam area Surabaya.');
+      toast.error('Deskripsi kronologi masalah wajib diisi');
       return;
     }
 
     setIsSubmitting(true);
+    const kecName = selectedDistrict.name;
+
     try {
       const formData = new FormData();
       formData.append('title', title.trim());
@@ -213,7 +166,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
       formData.append('category', category);
       formData.append('latitude', String(activeLocation.lat));
       formData.append('longitude', String(activeLocation.lng));
-      formData.append('kecamatan', kecMatch.name);
+      formData.append('kecamatan', kecName);
       if (address) formData.append('address', address.trim());
       if (audioTranscript) formData.append('audioTranscript', audioTranscript);
 
@@ -221,17 +174,13 @@ const ReportForm: React.FC<ReportFormProps> = ({
         formData.append('photos', photo);
       });
 
-      if (audioBlob) {
-        formData.append('audio', audioBlob, 'recording.webm');
-      }
-
       try {
         const res = (await reportsApi.create(formData)) as any;
         if (res?.report) {
           addReport(res.report);
         }
       } catch {
-        // Fallback local report creation if offline/mock
+        // Fallback local report creation
         addReport({
           id: `rep-warga-${Date.now()}`,
           title: title.trim(),
@@ -240,28 +189,41 @@ const ReportForm: React.FC<ReportFormProps> = ({
           status: 'BARU',
           latitude: activeLocation.lat,
           longitude: activeLocation.lng,
-          address: address.trim() || undefined,
-          kecamatan: kecMatch.name,
+          address: address.trim() || `Jl. Protokol, Kec. ${kecName}`,
+          kecamatan: kecName,
           kelurahan: {
-            id: `kel-${kecMatch.name.toLowerCase().replace(/\s+/g, '-')}`,
-            name: kecMatch.name,
-            kecamatan: kecMatch.name,
+            id: `kel-${kecName.toLowerCase()}`,
+            name: kecName,
+            kecamatan: kecName,
           },
-          skorUrgensi: 60,
-          urgensiKeywords: ['laporan warga'],
-          photos: [],
-          userId: user?.id || 'user-warga-1',
-          user: { id: user?.id || 'user-warga-1', name: user?.name || 'Warga Surabaya' },
+          skorUrgensi: category === 'BANJIR' ? 85 : category === 'KEAMANAN' ? 75 : 55,
+          urgensiKeywords: ['laporan baru', 'warga', kecName.toLowerCase()],
+          photos: photos.map((p) => URL.createObjectURL(p)),
+          audioTranscript: audioTranscript || undefined,
+          userId: user?.id || 'warga-1',
+          user: {
+            id: user?.id || 'warga-1',
+            name: user?.name || 'Warga Surabaya',
+          },
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          statusLogs: [
+            {
+              id: `log-${Date.now()}`,
+              reportId: `rep-warga-${Date.now()}`,
+              toStatus: 'BARU',
+              note: 'Laporan berhasil dibuat dan masuk antrean sistem.',
+              changedAt: new Date().toISOString(),
+              changedBy: { id: user?.id || 'warga-1', name: user?.name || 'Warga Pelapor', role: 'WARGA' },
+            },
+          ],
         });
       }
 
       setStep('success');
-      toast.success('Matur nuwun, laporanmu wes masuk!');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Waduh, ada yang error. Coba lagi sebentar.';
-      toast.error(msg);
+      toast.success('Laporan pengaduan berhasil dikirim!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal mengirim laporan');
     } finally {
       setIsSubmitting(false);
     }
@@ -269,17 +231,16 @@ const ReportForm: React.FC<ReportFormProps> = ({
 
   if (step === 'success') {
     return (
-      <div className="bg-paper-white p-6 border border-ink flex flex-col items-center text-center space-y-4 font-body text-ink">
-        <div className="border-2 border-dashed border-ink p-4 w-full flex flex-col items-center gap-2 bg-paper-kraft/40">
-          <div className="official-stamp text-xs">
-            <span>TERCATAT</span>
-            <span className="text-[9px]">KOTA SURABAYA</span>
-          </div>
-          <h3 className="font-body font-bold text-base text-ink tracking-tight uppercase mt-1">
-            MATUR NUWUN, LAPORANMU WES MASUK
+      <div className="bg-white p-6 rounded-xl flex flex-col items-center text-center space-y-4 font-sans text-slate-800">
+        <div className="w-14 h-14 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
+          <IconCheck className="w-8 h-8" />
+        </div>
+        <div>
+          <h3 className="font-bold text-base text-navy">
+            Matur Nuwun! Laporan Berhasil Dikirim
           </h3>
-          <p className="font-mono text-xs text-ink/70 max-w-sm">
-            Laporanmu wes tercatat di arsip pengaduan kelurahan. Petugas bakal segera nindaklanjuti.
+          <p className="text-xs text-slate-500 max-w-sm mt-1">
+            Pengaduanmu telah tercatat di antrean Command Center Surabaya. Petugas dan dinas terkait akan segera menindaklanjuti.
           </p>
         </div>
         <button
@@ -287,33 +248,40 @@ const ReportForm: React.FC<ReportFormProps> = ({
             if (onSuccess) onSuccess();
             handleClose();
           }}
-          className="btn-paper-primary w-full py-2.5 text-xs font-mono font-bold"
+          className="btn-navy w-full py-2.5 text-xs font-semibold"
         >
-          KEMBALI KE PETA
+          Lihat di Dashboard Warga
         </button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-paper-white p-4 sm:p-5 border border-ink space-y-4 text-xs font-body text-ink">
-      {/* Header Form Dokumen */}
-      <div className="border-b border-ink/40 pb-2 mb-3">
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-ink/60">
-            KOTA SURABAYA · PENGADUAN WARGA
-          </span>
-          <span className="font-mono text-[10px] text-ink/60">BLANGKO RESMI</span>
+    <form onSubmit={handleSubmit} className="bg-white p-5 space-y-4 text-xs font-sans text-slate-800">
+      {/* Header Form */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <div className="flex items-center gap-1.5 text-[10px] text-orange font-bold uppercase tracking-wider">
+            <IconBuildingCommunity className="w-3.5 h-3.5" />
+            <span>KOTA SURABAYA · FORMULIR PENGADUAN WARGA</span>
+          </div>
+          <h2 className="font-bold text-sm text-navy mt-0.5">
+            Buat Laporan / Keluhan Baru
+          </h2>
         </div>
-        <h2 className="font-body font-bold text-sm text-ink tracking-tight mt-0.5 uppercase">
-          FORMULIR LAPORAN WARGA SURABAYA
-        </h2>
+        <button
+          type="button"
+          onClick={handleClose}
+          className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+        >
+          <IconX className="w-5 h-5" />
+        </button>
       </div>
 
-      {/* 01: Kategori Masalah */}
+      {/* 01: Kategori Gangguan */}
       <div>
-        <label className="font-mono text-[11px] font-bold uppercase tracking-wider text-ink/80 block mb-1.5">
-          [01] KATEGORI GANGGUAN
+        <label className="font-semibold text-slate-700 block mb-1.5 text-xs">
+          1. Pilih Kategori Masalah
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
           {CATEGORIES.map((cat) => {
@@ -324,10 +292,10 @@ const ReportForm: React.FC<ReportFormProps> = ({
                 type="button"
                 onClick={() => setCategory(cat)}
                 className={clsx(
-                  'px-2.5 py-2 border text-left flex items-center gap-2 transition-all font-body text-xs',
+                  'px-2.5 py-2 rounded-lg border text-left flex items-center gap-2 transition-all text-xs font-medium',
                   isSelected
-                    ? 'bg-paper-kraft border-ink font-bold shadow-none'
-                    : 'bg-paper-white border-ink/30 text-ink/70 hover:border-ink hover:text-ink'
+                    ? 'bg-navy text-white border-navy font-bold shadow-xs'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                 )}
               >
                 {CATEGORY_ICON_MAP[cat]}
@@ -338,126 +306,127 @@ const ReportForm: React.FC<ReportFormProps> = ({
         </div>
       </div>
 
-      {/* 02: Judul Laporan */}
+      {/* 02: Judul Singkat */}
       <div>
-        <label className="font-mono text-[11px] font-bold uppercase tracking-wider text-ink/80 block mb-1">
-          [02] PERIHAL / JUDUL SINGKAT
+        <label className="font-semibold text-slate-700 block mb-1 text-xs">
+          2. Judul Laporan Singkat
         </label>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Contoh: Aspal amblas depan kantor kelurahan…"
-          className="input-paper text-xs"
+          placeholder="Contoh: Aspal berlubang parah depan Balai RW..."
+          className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy"
+          required
         />
       </div>
 
-      {/* 03: Lokasi */}
+      {/* 03: Pilih Wilayah & Titik Lokasi */}
       <div>
-        <label className="font-mono text-[11px] font-bold uppercase tracking-wider text-ink/80 block mb-1">
-          [03] KOORDINAT TITIK LAPORAN
+        <label className="font-semibold text-slate-700 block mb-1 text-xs">
+          3. Wilayah Kecamatan di Surabaya
         </label>
-        <div className="flex gap-2">
-          <div className="flex-1 bg-paper-blue/40 border border-ink px-3 py-2 font-mono text-xs flex items-center justify-between">
-            {activeLocation ? (
-              <span className="font-bold text-ink">
-                LON: {activeLocation.lng.toFixed(5)} · LAT: {activeLocation.lat.toFixed(5)}
-                {detectedKecamatan ? ` · Kec. ${detectedKecamatan}` : ''}
-              </span>
-            ) : (
-              <span className="text-ink/50 italic">Titik belum ditentukan pada peta</span>
-            )}
-            <IconMapPin className="w-4 h-4 text-ink shrink-0" stroke={1.5} />
-          </div>
-          <button
-            type="button"
-            onClick={onPickLocation}
-            className="btn-paper-secondary shrink-0 font-mono font-bold text-[11px]"
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <select
+            value={selectedDistrict.name}
+            onChange={(e) => {
+              const found = SURABAYA_DISTRICTS.find((d) => d.name === e.target.value);
+              if (found) setSelectedDistrict(found);
+            }}
+            className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-700 focus:outline-none focus:border-navy"
           >
-            TENTUKAN DI PETA
-          </button>
+            {SURABAYA_DISTRICTS.map((d) => (
+              <option key={d.name} value={d.name}>
+                Kecamatan {d.name}
+              </option>
+            ))}
+          </select>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 flex items-center justify-between text-[11px] text-slate-600 font-mono">
+            <span>
+              Lat: {activeLocation.lat.toFixed(4)}, Lng: {activeLocation.lng.toFixed(4)}
+            </span>
+            <IconMapPin className="w-3.5 h-3.5 text-orange shrink-0" />
+          </div>
         </div>
       </div>
 
-      {/* 04: Deskripsi & Audio Voice */}
+      {/* 04: Deskripsi & Rekam Suara */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="font-mono text-[11px] font-bold uppercase tracking-wider text-ink/80">
-            [04] KRONOLOGI & DETAIL MASALAH
+          <label className="font-semibold text-slate-700 text-xs">
+            4. Detail Kronologi Masalah
           </label>
           <button
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
             className={clsx(
-              'px-2 py-0.5 border text-[10px] font-mono flex items-center gap-1 transition-all',
+              'px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all',
               isRecording
-                ? 'bg-stamp-red text-paper-white border-ink animate-pulse font-bold'
-                : 'bg-paper-white border-ink/40 text-ink hover:bg-paper-kraft'
+                ? 'bg-red-600 text-white animate-pulse'
+                : 'bg-orange-50 text-orange-800 border border-orange-200 hover:bg-orange-100'
             )}
           >
-            {isRecording ? (
-              <IconMicrophoneOff className="w-3 h-3" stroke={1.5} />
-            ) : (
-              <IconMicrophone className="w-3 h-3" stroke={1.5} />
-            )}
-            <span>{isRecording ? 'HENTIKAN REKAM' : 'REKAM SUARA'}</span>
+            {isRecording ? <IconMicrophoneOff className="w-3.5 h-3.5" /> : <IconMicrophone className="w-3.5 h-3.5" />}
+            <span>{isRecording ? 'Hentikan Rekam' : 'Rekam Suara'}</span>
           </button>
         </div>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Ceritakan kronologi masalahnya, Cak/Ning…"
+          placeholder="Ceritakan permasalahan secara jelas dan lengkap..."
           rows={3}
-          className="input-paper text-xs resize-none"
+          className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy resize-none"
+          required
         />
       </div>
 
-      {/* 05: Alamat / Patokan */}
+      {/* 05: Alamat Patokan */}
       <div>
-        <label className="font-mono text-[11px] font-bold uppercase tracking-wider text-ink/80 block mb-1">
-          [05] ALAMAT / PATOKAN (OPSIONAL)
+        <label className="font-semibold text-slate-700 block mb-1 text-xs">
+          5. Alamat / Patokan Khusus (Opsional)
         </label>
         <input
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="Contoh: Jl. Embong Malang No. 10, RT 02/RW 01…"
-          className="input-paper text-xs"
+          placeholder="Contoh: Jl. Dharmawangsa No. 12, seberang masjid..."
+          className="w-full p-2.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:border-navy"
         />
       </div>
 
       {/* 06: Lampiran Foto */}
       <div>
-        <label className="font-mono text-[11px] font-bold uppercase tracking-wider text-ink/80 block mb-1">
-          [06] LAMPIRAN FOTO BUKTI (MAKS. 4 BERKAS)
+        <label className="font-semibold text-slate-700 block mb-1 text-xs">
+          6. Foto Bukti Lapangan (Maks. 4 Foto)
         </label>
         <div
           {...getRootProps()}
           className={clsx(
-            'border-2 border-dashed p-3 text-center cursor-pointer transition-all',
+            'border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-all',
             isDragActive
-              ? 'border-ink bg-paper-kraft'
-              : 'border-ink/40 hover:border-ink bg-paper-white'
+              ? 'border-navy bg-navy-50'
+              : 'border-slate-300 hover:border-navy bg-slate-50'
           )}
         >
           <input {...getInputProps()} />
-          <IconUpload className="w-4 h-4 mx-auto text-ink/60 mb-1" stroke={1.5} />
-          <p className="text-ink/60 text-[11px] font-sans">
-            {isDragActive ? 'Lepaskan berkas foto di sini' : 'Klik atau seret foto bukti ke sini'}
+          <IconUpload className="w-4 h-4 mx-auto text-slate-400 mb-1" />
+          <p className="text-slate-500 text-[11px]">
+            {isDragActive ? 'Lepaskan foto di sini' : 'Klik atau seret foto bukti ke sini'}
           </p>
         </div>
         {photos.length > 0 && (
           <div className="grid grid-cols-4 gap-2 mt-2">
             {photos.map((p, idx) => (
-              <div key={idx} className="relative aspect-square border border-ink overflow-hidden bg-paper-kraft">
+              <div key={idx} className="relative aspect-square border border-slate-200 rounded-lg overflow-hidden bg-slate-100">
                 <img src={URL.createObjectURL(p)} alt="" className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={() => setPhotos((prev) => prev.filter((_, i) => i !== idx))}
-                  className="absolute top-0.5 right-0.5 bg-stamp-red text-paper-white w-4 h-4 text-[10px] flex items-center justify-center border border-ink"
+                  className="absolute top-1 right-1 bg-red-600 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center"
                   title="Hapus foto"
                 >
-                  <IconX className="w-3 h-3" stroke={2} />
+                  <IconX className="w-3 h-3" />
                 </button>
               </div>
             ))}
@@ -470,26 +439,26 @@ const ReportForm: React.FC<ReportFormProps> = ({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="btn-paper-primary flex-1 py-2 text-xs font-mono font-bold flex items-center justify-center gap-1.5"
+          className="btn-navy flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm"
         >
           {isSubmitting ? (
             <>
-              <IconLoader2 className="w-4 h-4 animate-spin" stroke={1.5} />
-              <span>MENGIRIM LAPORAN…</span>
+              <IconLoader2 className="w-4 h-4 animate-spin text-orange" />
+              <span>Mengirim Laporan...</span>
             </>
           ) : (
             <>
-              <IconSend className="w-4 h-4" stroke={1.5} />
-              <span>KIRIM LAPORAN</span>
+              <IconSend className="w-4 h-4 text-orange" />
+              <span>Kirim Pengaduan Sekarang</span>
             </>
           )}
         </button>
         <button
           type="button"
           onClick={handleClose}
-          className="btn-paper-secondary px-4 text-xs font-mono"
+          className="btn-outline px-4 text-xs font-medium"
         >
-          BATAL
+          Batal
         </button>
       </div>
     </form>

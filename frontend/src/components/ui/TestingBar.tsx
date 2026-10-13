@@ -54,7 +54,7 @@ export const TestingBar: React.FC = () => {
       {/* Testing Top Floater */}
       <aside 
         aria-label="Panel Uji Coba Pengembang"
-        className="fixed bottom-3 right-3 z-50 transition-all duration-200 shadow-xl max-w-xl"
+        className="fixed bottom-2 left-2 right-2 sm:left-auto sm:right-3 sm:bottom-3 z-50 transition-all duration-200 shadow-xl sm:max-w-xl"
       >
         <div className="bg-navy text-white rounded-lg border border-navy-700 shadow-elevated overflow-hidden text-xs">
           {/* Header Row */}

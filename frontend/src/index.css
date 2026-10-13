@@ -44,19 +44,28 @@
   box-sizing: border-box;
 }
 
-html, body, #root {
-  height: 100%;
+html {
+  min-height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
-  background-color: #FFFFFF;
-  color: var(--text-primary);
 }
 
 body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: #FFFFFF;
+  color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Subtle accent banner line */

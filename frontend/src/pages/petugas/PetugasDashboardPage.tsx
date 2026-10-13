@@ -44,6 +44,7 @@ const PetugasDashboardPage: React.FC = () => {
   const [actionStatus, setActionStatus] = useState<ReportStatus>('DIPROSES');
   const [actionNote, setActionNote] = useState('');
   const [showRekapModal, setShowRekapModal] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'queue' | 'map'>('queue');
 
   // Filter and sort reports: Urgent at the TOP!
   const sortedAndFilteredReports = useMemo(() => {
@@ -280,9 +281,40 @@ const PetugasDashboardPage: React.FC = () => {
       </section>
 
       {/* Main Command Center Grid: Left = Queue, Right = Interactive Map + Detail */}
-      <main className="max-w-7xl mx-auto px-4 py-4 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left Column (5 Cols): Antrean Laporan (Urgent di Atas) */}
-        <section className="lg:col-span-5 flex flex-col bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs h-[720px]">
+      <main className="max-w-7xl mx-auto px-4 py-4 flex-1 w-full">
+        {/* Mobile View Switcher */}
+        <div className="lg:hidden flex items-center bg-slate-200 p-1 rounded-xl mb-3 text-xs font-semibold shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setMobileTab('queue')}
+            className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mobileTab === 'queue'
+                ? 'bg-navy text-white shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <IconFlame className="w-3.5 h-3.5 text-orange" />
+            <span>Antrean Laporan ({sortedAndFilteredReports.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('map')}
+            className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mobileTab === 'map'
+                ? 'bg-navy text-white shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <IconMapPin className="w-3.5 h-3.5 text-orange" />
+            <span>Peta & Tindakan</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Left Column (5 Cols): Antrean Laporan (Urgent di Atas) */}
+          <section className={`lg:col-span-5 flex-col bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs h-[520px] lg:h-[720px] ${
+            mobileTab === 'queue' ? 'flex' : 'hidden lg:flex'
+          }`}>
           <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <IconFlame className="w-4 h-4 text-orange" />
@@ -361,7 +393,9 @@ const PetugasDashboardPage: React.FC = () => {
         </section>
 
         {/* Right Column (7 Cols): Command Center Map & Detail Panel */}
-        <section className="lg:col-span-7 flex flex-col gap-4 h-[720px]">
+        <section className={`lg:col-span-7 flex-col gap-4 h-[520px] lg:h-[720px] ${
+          mobileTab === 'map' ? 'flex' : 'hidden lg:flex'
+        }`}>
           {/* Top Half: Interactive Map */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs flex-1 flex flex-col">
             <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
@@ -442,6 +476,7 @@ const PetugasDashboardPage: React.FC = () => {
             </div>
           )}
         </section>
+        </div>
       </main>
 
       {/* Action Dialog: Update Status & Action Note */}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   IconBuildingCommunity,
@@ -15,6 +15,8 @@ import {
   IconSearch,
   IconChevronRight,
   IconTrophy,
+  IconMenu2,
+  IconX,
 } from '@tabler/icons-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useReportsStore } from '../../stores/reportsStore';
@@ -25,6 +27,7 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, loginAsRole } = useAuthStore();
   const { reports } = useReportsStore();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const totalReports = reports.length;
   const completedReports = reports.filter(r => r.status === 'SELESAI').length;
@@ -67,6 +70,7 @@ const LandingPage: React.FC = () => {
             </Link>
           </div>
 
+          {/* Desktop & Mobile Actions */}
           <div className="flex items-center gap-2 text-xs">
             {user ? (
               <div className="flex items-center gap-2">
@@ -76,14 +80,15 @@ const LandingPage: React.FC = () => {
                     else if (user.role === 'SUPERADMIN' || user.role === 'ADMIN') navigate('/superadmin');
                     else navigate('/dashboard');
                   }}
-                  className="btn-navy py-1.5 px-3.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                  className="btn-navy py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5 shadow-sm"
                 >
-                  <span>Buka Dashboard ({user.role})</span>
+                  <span className="hidden sm:inline">Buka Dashboard ({user.role})</span>
+                  <span className="sm:hidden">Dashboard</span>
                   <IconArrowRight className="w-3.5 h-3.5 text-orange" />
                 </button>
               </div>
             ) : (
-              <>
+              <div className="hidden sm:flex items-center gap-2">
                 <Link
                   to="/login"
                   className="btn-outline py-1.5 px-3 text-xs"
@@ -96,10 +101,66 @@ const LandingPage: React.FC = () => {
                 >
                   Daftar Warga
                 </Link>
-              </>
+              </div>
             )}
+
+            {/* Mobile Hamburger Toggle Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+              aria-label="Buka Menu"
+            >
+              {isMobileMenuOpen ? <IconX className="w-5 h-5" /> : <IconMenu2 className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Dropdown Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-2 text-xs animate-in slide-in-from-top duration-150 shadow-md">
+            <a
+              href="#alur"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block py-2 text-slate-700 font-medium hover:text-navy"
+            >
+              Alur Pelaporan
+            </a>
+            <a
+              href="#peta"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="block py-2 text-slate-700 font-medium hover:text-navy"
+            >
+              Peta Publik Kota
+            </a>
+            <Link
+              to="/leaderboard"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="flex items-center gap-1.5 py-2 text-slate-700 font-medium hover:text-navy"
+            >
+              <IconTrophy className="w-4 h-4 text-orange" />
+              <span>Leaderboard Kelurahan</span>
+            </Link>
+
+            {!user && (
+              <div className="pt-2 border-t border-slate-100 flex gap-2">
+                <Link
+                  to="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="btn-outline flex-1 py-2 text-center text-xs"
+                >
+                  Masuk
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="btn-navy flex-1 py-2 text-center text-xs"
+                >
+                  Daftar
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}

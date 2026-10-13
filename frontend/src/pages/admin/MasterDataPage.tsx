@@ -190,10 +190,10 @@ const MasterDataPage: React.FC = () => {
 
       {/* Tabs Bar */}
       <div className="bg-white border-b border-slate-200 px-4">
-        <div className="max-w-6xl mx-auto flex items-center gap-6 text-xs font-semibold">
+        <div className="max-w-6xl mx-auto flex items-center gap-4 sm:gap-6 text-xs font-semibold overflow-x-auto whitespace-nowrap">
           <button
             onClick={() => setActiveTab('kategori')}
-            className={`py-3.5 border-b-2 transition-all flex items-center gap-2 ${
+            className={`py-3.5 border-b-2 transition-all flex items-center gap-2 shrink-0 ${
               activeTab === 'kategori'
                 ? 'border-navy text-navy font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -264,8 +264,8 @@ const MasterDataPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-              <table className="w-full text-left text-xs">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-2xs">
+              <table className="w-full text-left text-xs min-w-[550px]">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                   <tr>
                     <th className="p-3">Nama Kategori</th>
@@ -374,8 +374,8 @@ const MasterDataPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-              <table className="w-full text-left text-xs">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-2xs">
+              <table className="w-full text-left text-xs min-w-[500px]">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                   <tr>
                     <th className="p-3">Nama & Profil</th>
