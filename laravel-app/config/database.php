@@ -59,9 +59,25 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            'options' => extension_loaded('pdo_mysql') ? (function () {
+                $options = [];
+                $ca = env('MYSQL_ATTR_SSL_CA');
+                if ($ca && is_file($ca)) {
+                    $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
+                } elseif (env('DB_PORT') == '4000' || env('MYSQL_SSL')) {
+                    foreach ([
+                        '/etc/ssl/certs/ca-certificates.crt',
+                        '/etc/pki/tls/certs/ca-bundle.crt',
+                        '/etc/ssl/ca-bundle.pem',
+                    ] as $certPath) {
+                        if (is_file($certPath)) {
+                            $options[PDO::MYSQL_ATTR_SSL_CA] = $certPath;
+                            break;
+                        }
+                    }
+                }
+                return $options;
+            })() : [],
         ],
 
         'mariadb' => [
