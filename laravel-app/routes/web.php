@@ -23,23 +23,34 @@ Route::get('/laporan/{id}', function (string $id) {
     ]);
 })->name('reports.show');
 
-// ─── Auth / User Pages ────────────────────────────────────────────────────────
+// ─── Direct Reporting Entry ──────────────────────────────────────────────────
+Route::get('/lapor', function () {
+    return redirect()->route('peta', ['lapor' => 'true']);
+})->middleware('auth')->name('reports.create');
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->name('dashboard');
+// ─── Protected Role-Based Pages ──────────────────────────────────────────────
 
-Route::get('/petugas', function () {
-    return Inertia::render('Petugas/Dashboard');
-})->name('petugas.dashboard');
+Route::middleware(['auth', 'role:WARGA'])->group(function () {
+    Route::get('/dashboard', function () {
+        return Inertia::render('Dashboard');
+    })->name('dashboard');
+});
 
-Route::get('/superadmin', function () {
-    return Inertia::render('Admin/Dashboard');
-})->name('admin.dashboard');
+Route::middleware(['auth', 'role:PETUGAS'])->group(function () {
+    Route::get('/petugas', function () {
+        return Inertia::render('Petugas/Dashboard');
+    })->name('petugas.dashboard');
+});
 
-Route::get('/superadmin/master', function () {
-    return Inertia::render('Admin/MasterData');
-})->name('admin.master');
+Route::middleware(['auth', 'role:ADMIN,SUPERADMIN'])->group(function () {
+    Route::get('/superadmin', function () {
+        return Inertia::render('Admin/Dashboard');
+    })->name('admin.dashboard');
+
+    Route::get('/superadmin/master', function () {
+        return Inertia::render('Admin/MasterData');
+    })->name('admin.master');
+});
 
 // ─── Auth Routes ──────────────────────────────────────────────────────────────
 

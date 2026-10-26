@@ -21,13 +21,24 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);
+
+        $middleware->alias([
+            'role' => \App\Http\Middleware\EnsureUserHasRole::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
         $exceptions->respond(function ($response, Throwable $e) {
-            if (request()->has('debug') || env('APP_DEBUG')) {
+            if ($e instanceof \Illuminate\Auth\AuthenticationException
+                || $e instanceof \Illuminate\Auth\Access\AuthorizationException
+                || $e instanceof \Illuminate\Validation\ValidationException
+                || $e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                return $response;
+            }
+
+            if (request()->has('debug')) {
                 return response(
                     "ERROR: " . $e->getMessage() . "\n" .
                     "FILE: " . $e->getFile() . ":" . $e->getLine() . "\n\n" .

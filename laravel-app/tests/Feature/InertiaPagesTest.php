@@ -44,28 +44,32 @@ class InertiaPagesTest extends TestCase
 
     public function test_dashboard_page_renders_successfully(): void
     {
-        $response = $this->get('/dashboard');
+        $warga = \App\Models\User::factory()->create(['role' => 'WARGA']);
+        $response = $this->actingAs($warga)->get('/dashboard');
         $response->assertStatus(200);
         $response->assertInertia(fn (Assert $page) => $page->component('Dashboard'));
     }
 
     public function test_petugas_dashboard_page_renders_successfully(): void
     {
-        $response = $this->get('/petugas');
+        $petugas = \App\Models\User::factory()->create(['role' => 'PETUGAS']);
+        $response = $this->actingAs($petugas)->get('/petugas');
         $response->assertStatus(200);
         $response->assertInertia(fn (Assert $page) => $page->component('Petugas/Dashboard'));
     }
 
     public function test_superadmin_dashboard_page_renders_successfully(): void
     {
-        $response = $this->get('/superadmin');
+        $superadmin = \App\Models\User::factory()->create(['role' => 'SUPERADMIN']);
+        $response = $this->actingAs($superadmin)->get('/superadmin');
         $response->assertStatus(200);
         $response->assertInertia(fn (Assert $page) => $page->component('Admin/Dashboard'));
     }
 
     public function test_master_data_page_renders_successfully(): void
     {
-        $response = $this->get('/superadmin/master');
+        $superadmin = \App\Models\User::factory()->create(['role' => 'SUPERADMIN']);
+        $response = $this->actingAs($superadmin)->get('/superadmin/master');
         $response->assertStatus(200);
         $response->assertInertia(fn (Assert $page) => $page->component('Admin/MasterData'));
     }
