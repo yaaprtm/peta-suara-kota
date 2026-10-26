@@ -16,12 +16,14 @@ import {
   IconSettings,
   IconMapPin,
   IconSearch,
+  IconDownload,
 } from '@tabler/icons-react';
 import { format, parseISO } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useReportsStore } from '@/stores/reportsStore';
+import { reportsApi } from '@/lib/api';
 import { User, UserRole } from '@/types';
 import { UrgencyBadge, StatusBadge, CategoryBadge, Avatar } from '@/Components/ui/Badges';
 import { LanguageToggleDark } from '@/Components/ui/LanguageToggle';
@@ -100,6 +102,15 @@ const SuperadminDashboardPage: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <LanguageToggleDark />
+            <a
+              href={reportsApi.getExportUrl()}
+              download="audit-laporan-surabaya.csv"
+              className="bg-navy-800 hover:bg-navy-700 text-white border border-white/20 font-semibold px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 shadow-sm"
+              title="Unduh seluruh rekap pengaduan format CSV untuk dinas"
+            >
+              <IconDownload className="w-4 h-4 text-orange" />
+              <span className="hidden sm:inline">Ekspor CSV</span>
+            </a>
             <Link href="/superadmin/master"
               className="bg-orange hover:bg-orange-600 text-navy-900 font-semibold px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 shadow-sm"
             >

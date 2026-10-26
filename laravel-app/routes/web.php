@@ -52,3 +52,8 @@ Route::get('/register', function () {
 })->name('register');
 
 require __DIR__.'/auth.php';
+
+// ─── Fallback Graceful Route ──────────────────────────────────────────────────
+Route::fallback(function () {
+    return redirect()->route('landing');
+});

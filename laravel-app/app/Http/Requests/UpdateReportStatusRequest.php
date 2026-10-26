@@ -17,6 +17,8 @@ class UpdateReportStatusRequest extends FormRequest
         return [
             'status' => ['required', 'string', 'in:BARU,DIPROSES,SELESAI,DITOLAK'],
             'note' => ['nullable', 'string', 'max:1000'],
+            'completion_note' => ['nullable', 'string', 'max:2000'],
+            'completion_photos' => ['nullable'],
         ];
     }
 

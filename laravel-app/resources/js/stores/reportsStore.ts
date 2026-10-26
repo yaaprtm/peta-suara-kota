@@ -24,7 +24,14 @@ interface ReportsState {
   setFilter: (filter: Partial<MapFilter>) => void;
   setTimeRange: (start: Date, end: Date) => void;
   addReport: (report: Report) => void;
-  updateReportStatus: (reportId: string, status: Report['status'], note?: string, changedBy?: { id: string; name: string; role: any }) => void;
+  updateReportStatus: (
+    reportId: string,
+    status: Report['status'],
+    note?: string,
+    changedBy?: { id: string; name: string; role: any },
+    completionData?: { completionNote?: string; completionPhotos?: string[] }
+  ) => void;
+  upvoteReport: (reportId: string) => void;
   resetReports: () => void;
   openPanel: () => void;
   closePanel: () => void;
@@ -147,7 +154,7 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
     set({ reports, filteredReports: filtered });
   },
 
-  updateReportStatus: (reportId, status, note, changedBy) => {
+  updateReportStatus: (reportId, status, note, changedBy, completionData) => {
     const reports = get().reports.map(r => {
       if (r.id !== reportId) return r;
       const logs = r.statusLogs || [];
@@ -165,12 +172,33 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
         status,
         statusLogs: [newLog, ...logs],
         updatedAt: new Date().toISOString(),
+        ...(status === 'SELESAI' ? {
+          completionNote: completionData?.completionNote || r.completionNote,
+          completionPhotos: completionData?.completionPhotos || r.completionPhotos,
+          resolvedAt: new Date().toISOString(),
+        } : {}),
       };
     });
 
     const selectedReport = get().selectedReport;
     const updatedSelected = selectedReport?.id === reportId
       ? reports.find(r => r.id === reportId) || selectedReport
+      : selectedReport;
+    const filtered = applyFilters(reports, get().filter, get().timeRange);
+    set({ reports, filteredReports: filtered, selectedReport: updatedSelected });
+  },
+
+  upvoteReport: (reportId) => {
+    const reports = get().reports.map(r => {
+      if (r.id !== reportId) return r;
+      return {
+        ...r,
+        upvotesCount: (r.upvotesCount ?? 0) + 1,
+      };
+    });
+    const selectedReport = get().selectedReport;
+    const updatedSelected = selectedReport?.id === reportId
+      ? { ...selectedReport, upvotesCount: (selectedReport.upvotesCount ?? 0) + 1 }
       : selectedReport;
     const filtered = applyFilters(reports, get().filter, get().timeRange);
     set({ reports, filteredReports: filtered, selectedReport: updatedSelected });

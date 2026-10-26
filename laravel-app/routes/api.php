@@ -19,6 +19,9 @@ Route::middleware(['web'])->group(function () {
     Route::prefix('reports')->group(function () {
         Route::get('viewport', [ReportController::class, 'viewport']);
         Route::get('stream', [ReportController::class, 'stream']);
+        Route::get('export', [ReportController::class, 'export']);
+        Route::get('track/{code}', [ReportController::class, 'track']);
+        Route::post('{id}/upvote', [ReportController::class, 'upvote']);
         Route::get('/', [ReportController::class, 'index']);
         Route::get('{id}', [ReportController::class, 'show']);
 

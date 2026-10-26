@@ -4,6 +4,20 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="description" content="Peta Suara Kota Surabaya — Command Center Pelaporan Masalah & Aspirasi Warga Surabaya. Laporkan masalah infrastruktur, kebersihan, banjir, dan keamanan di Kota Surabaya.">
+        <meta name="theme-color" content="#0f172a">
+        <meta name="author" content="Tim Workshop Peta Suara Kota — Universitas Surabaya">
+
+        <!-- Open Graph -->
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="Peta Suara Kota Surabaya">
+        <meta property="og:description" content="Command Center Pelaporan Masalah & Aspirasi Warga Kota Surabaya. Pantau, laporkan, dan tindak lanjuti permasalahan kota secara real-time.">
+        <meta property="og:site_name" content="Peta Suara Kota Surabaya">
+        <meta property="og:locale" content="id_ID">
+
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Peta Suara Kota Surabaya">
+        <meta name="twitter:description" content="Command Center Pelaporan Masalah & Aspirasi Warga Kota Surabaya.">
 
         <title inertia>{{ config('app.name', 'Peta Suara Kota Surabaya') }}</title>
 

@@ -163,11 +163,32 @@ export const reportsApi = {
       body: formData,
     }),
 
-  updateStatus: (id: string, status: string, note?: string) =>
+  updateStatus: (id: string, status: string, note?: string, completionData?: { completionNote?: string; completionPhotos?: string[] }) =>
     request<{ report: Report }>(`/reports/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status, note }),
+      body: JSON.stringify({
+        status,
+        note,
+        completion_note: completionData?.completionNote,
+        completion_photos: completionData?.completionPhotos,
+      }),
     }),
+
+  upvote: (id: string) =>
+    request<{ message: string; upvotesCount: number; report: Report }>(`/reports/${id}/upvote`, {
+      method: 'POST',
+    }),
+
+  track: (code: string) =>
+    request<{ report: Report }>(`/reports/track/${encodeURIComponent(code)}`),
+
+  getExportUrl: (category?: string, status?: string) => {
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    if (status) params.set('status', status);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return `${BASE_URL}/reports/export${qs}`;
+  },
 
   delete: (id: string) =>
     request<void>(`/reports/${id}`, { method: 'DELETE' }),

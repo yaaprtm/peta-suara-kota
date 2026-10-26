@@ -86,7 +86,7 @@ const ReportDetailPanel: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconBuildingCommunity className="w-4 h-4 text-ink/80" />
             <span className="font-mono text-xs font-bold text-ink tracking-wider">
-              {t('panel.dossierPrefix')}{report.id.slice(0, 8).toUpperCase()}
+              {report.trackingCode || `${t('panel.dossierPrefix')}${report.id.slice(0, 8).toUpperCase()}`}
             </span>
           </div>
           <button
@@ -103,11 +103,23 @@ const ReportDetailPanel: React.FC = () => {
           <UrgencyBadge score={report.skorUrgensi} />
           <StatusBadge status={report.status} />
           <CategoryBadge category={report.category} />
+          {report.upvotesCount !== undefined && report.upvotesCount > 0 && (
+            <span className="bg-paper-white border border-ink text-ink font-mono text-[10px] px-2 py-0.5">
+              👍 {report.upvotesCount} Dukungan
+            </span>
+          )}
         </div>
 
-        <h2 className="font-sans font-bold text-ink text-base leading-snug">
+        <h2 className="font-sans font-bold text-ink text-base leading-snug mb-2">
           {report.title}
         </h2>
+
+        <a
+          href={`/laporan/${report.id}`}
+          className="inline-flex items-center gap-1.5 text-[11px] font-sans font-bold text-navy hover:underline"
+        >
+          <span>Buka Berita Acara & Detail Lengkap ↗</span>
+        </a>
       </div>
 
       {/* ─── Content (scrollable) */}

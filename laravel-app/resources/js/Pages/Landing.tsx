@@ -10,9 +10,12 @@ import {
   IconTrophy,
   IconMenu2,
   IconX,
+  IconSearch,
+  IconLoader2,
 } from '@tabler/icons-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useReportsStore } from '@/stores/reportsStore';
+import { reportsApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useTranslation } from '@/i18n/useTranslation';
 import LanguageToggle from '@/Components/ui/LanguageToggle';
@@ -23,6 +26,8 @@ const LandingPage: React.FC = () => {
   const { reports } = useReportsStore();
   const { t } = useTranslation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [trackingInput, setTrackingInput] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   const totalReports = reports.length;
   const completedReports = reports.filter(r => r.status === 'SELESAI').length;
@@ -207,6 +212,62 @@ const LandingPage: React.FC = () => {
               <span className="text-xl sm:text-2xl font-bold text-navy">{t('landing.kpiCoverageSub1')}</span>
               <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Tracking Code Search ── */}
+      <section className="py-8 bg-white px-4 border-b border-slate-100">
+        <div className="max-w-xl mx-auto">
+          <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5 sm:p-6">
+            <div className="text-center mb-4">
+              <h3 className="text-sm font-bold text-navy">
+                {t('landing.trackTitle') || 'Cek Status Laporan Anda'}
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {t('landing.trackDesc') || 'Masukkan kode tiket laporan Anda (contoh: PSK-SBY-XXXXXX)'}
+              </p>
+            </div>
+            <form
+              className="flex gap-2"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const code = trackingInput.trim();
+                if (!code) return;
+                setIsSearching(true);
+                try {
+                  const data = await reportsApi.track(code);
+                  if (data.report) {
+                    router.visit(`/laporan/${data.report.id}`);
+                  } else {
+                    toast.error(t('landing.trackNotFound') || 'Laporan tidak ditemukan.');
+                  }
+                } catch {
+                  toast.error(t('landing.trackNotFound') || 'Kode tiket tidak ditemukan. Pastikan format kode benar.');
+                } finally {
+                  setIsSearching(false);
+                }
+              }}
+            >
+              <div className="flex-1 relative">
+                <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={trackingInput}
+                  onChange={(e) => setTrackingInput(e.target.value.toUpperCase())}
+                  placeholder="PSK-SBY-XXXXXX"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-mono text-navy focus:outline-none focus:ring-2 focus:ring-orange/40 focus:border-orange placeholder:text-slate-400"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSearching || !trackingInput.trim()}
+                className="btn-navy px-4 py-2.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {isSearching ? <IconLoader2 className="w-4 h-4 animate-spin" /> : <IconSearch className="w-4 h-4" />}
+                <span className="hidden sm:inline">{t('landing.trackBtn') || 'Lacak'}</span>
+              </button>
+            </form>
           </div>
         </div>
       </section>

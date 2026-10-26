@@ -6,6 +6,7 @@ import {
   IconKey,
   IconMap2,
   IconSatellite,
+  IconFlame,
 } from '@tabler/icons-react';
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
@@ -105,6 +106,11 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
   const mapStyleRef = useRef<MapStyleMode>(mapStyle);
   mapStyleRef.current = mapStyle;
 
+  // State mode Heatmap (Peta Panas Kepadatan Masalah)
+  const [isHeatmapMode, setIsHeatmapMode] = useState(false);
+  const isHeatmapModeRef = useRef(isHeatmapMode);
+  isHeatmapModeRef.current = isHeatmapMode;
+
   const { filteredReports, selectedReport, filter, hoveredReportId, fetchViewportReports } = useReportsStore();
 
   const filterRef = useRef(filter);
@@ -182,6 +188,12 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     if (!map.getLayer('unclustered-point')) return;
+
+    if (isHeatmapModeRef.current) {
+      markersOnScreenRef.current.forEach((m) => m.remove());
+      markersOnScreenRef.current.clear();
+      return;
+    }
 
     // Map id -> Report untuk pencarian O(1)
     const reportMap = new Map<string, Report>();
@@ -388,13 +400,65 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       );
     }
 
-    // 2. Layer Cluster Circles (Sesuai dominan kategori & ring merah jika ada kritis)
+    // 2. Layer Heatmap Kepadatan & Urgensi
+    if (!map.getLayer('reports-heatmap')) {
+      map.addLayer({
+        id: 'reports-heatmap',
+        type: 'heatmap',
+        source: 'reports-source',
+        maxzoom: 16,
+        layout: {
+          visibility: isHeatmapModeRef.current ? 'visible' : 'none',
+        },
+        paint: {
+          'heatmap-weight': [
+            'interpolate',
+            ['linear'],
+            ['get', 'skorUrgensi'],
+            0, 0.25,
+            100, 1.3,
+          ],
+          'heatmap-intensity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, 1.1,
+            15, 3.2,
+          ],
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'rgba(0, 0, 0, 0)',
+            0.15, 'rgba(42, 127, 134, 0.65)',
+            0.35, 'rgba(94, 124, 74, 0.8)',
+            0.6, 'rgba(230, 126, 34, 0.9)',
+            0.85, 'rgba(192, 57, 43, 0.95)',
+            1, 'rgba(120, 20, 15, 1)',
+          ],
+          'heatmap-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, 22,
+            13, 38,
+            16, 55,
+          ],
+          'heatmap-opacity': 0.85,
+        },
+      });
+    }
+
+    // 3. Layer Cluster Circles (Sesuai dominan kategori & ring merah jika ada kritis)
     if (!map.getLayer('clusters')) {
       map.addLayer({
         id: 'clusters',
         type: 'circle',
         source: 'reports-source',
         filter: ['has', 'point_count'],
+        layout: {
+          visibility: isHeatmapModeRef.current ? 'none' : 'visible',
+        },
         paint: {
           // Warna sesuai kategori dominan
           'circle-color': [
@@ -429,7 +493,7 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
       });
     }
 
-    // 3. Layer Cluster Count Label
+    // 4. Layer Cluster Count Label
     if (!map.getLayer('cluster-count')) {
       map.addLayer({
         id: 'cluster-count',
@@ -437,6 +501,7 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
         source: 'reports-source',
         filter: ['has', 'point_count'],
         layout: {
+          visibility: isHeatmapModeRef.current ? 'none' : 'visible',
           'text-field': ['get', 'point_count_abbreviated'],
           'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
           'text-size': 12,
@@ -638,29 +703,71 @@ const MapView: React.FC<MapViewProps> = ({ onSelectReport, onMapClick, isPicking
     }
   }, [mapStyle]);
 
+  const handleToggleHeatmap = useCallback(() => {
+    const next = !isHeatmapMode;
+    setIsHeatmapMode(next);
+    isHeatmapModeRef.current = next;
+
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (map.getLayer('reports-heatmap')) {
+      map.setLayoutProperty('reports-heatmap', 'visibility', next ? 'visible' : 'none');
+    }
+    if (map.getLayer('clusters')) {
+      map.setLayoutProperty('clusters', 'visibility', next ? 'none' : 'visible');
+    }
+    if (map.getLayer('cluster-count')) {
+      map.setLayoutProperty('cluster-count', 'visibility', next ? 'none' : 'visible');
+    }
+
+    if (next) {
+      markersOnScreenRef.current.forEach((m) => m.remove());
+      markersOnScreenRef.current.clear();
+    } else {
+      updateCustomMarkers();
+    }
+  }, [isHeatmapMode, updateCustomMarkers]);
+
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainerRef} className="w-full h-full" />
 
-      {/* ─── Tombol Ganti Tampilan Peta (Peta / Satelit) ────────────────────── */}
-      <button
-        type="button"
-        onClick={handleToggleStyle}
-        className="absolute bottom-3 left-3 z-[10] inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-paper-white text-ink border border-ink text-xs font-sans font-medium hover:bg-paper-kraft active:translate-y-[1px] transition-colors select-none"
-        title={mapStyle === 'peta' ? 'Ganti ke tampilan Satelit' : 'Ganti ke tampilan Peta'}
-      >
-        {mapStyle === 'peta' ? (
-          <>
-            <IconSatellite className="w-3.5 h-3.5 shrink-0" stroke={1.5} />
-            <span>Satelit</span>
-          </>
-        ) : (
-          <>
-            <IconMap2 className="w-3.5 h-3.5 shrink-0" stroke={1.5} />
-            <span>Peta</span>
-          </>
-        )}
-      </button>
+      {/* ─── Tombol Kontrol Peta (Peta / Satelit / Heatmap) ─────────────────── */}
+      <div className="absolute bottom-3 left-3 z-[10] flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={handleToggleStyle}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-paper-white text-ink border border-ink text-xs font-sans font-medium hover:bg-paper-kraft active:translate-y-[1px] transition-colors select-none shadow-xs"
+          title={mapStyle === 'peta' ? 'Ganti ke tampilan Satelit' : 'Ganti ke tampilan Peta'}
+        >
+          {mapStyle === 'peta' ? (
+            <>
+              <IconSatellite className="w-3.5 h-3.5 shrink-0" stroke={1.5} />
+              <span>Satelit</span>
+            </>
+          ) : (
+            <>
+              <IconMap2 className="w-3.5 h-3.5 shrink-0" stroke={1.5} />
+              <span>Peta</span>
+            </>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleToggleHeatmap}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-ink text-xs font-sans font-medium active:translate-y-[1px] transition-all select-none shadow-xs ${
+            isHeatmapMode
+              ? 'bg-[#C0392B] text-white border-[#C0392B] font-bold shadow-sm'
+              : 'bg-paper-white text-ink hover:bg-paper-kraft'
+          }`}
+          title="Tampilkan peta panas kepadatan dan tingkat urgensi masalah"
+        >
+          <IconFlame className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+          <span>Heatmap {isHeatmapMode ? 'Aktif' : ''}</span>
+        </button>
+      </div>
 
       {isPickingLocation && (
         <div

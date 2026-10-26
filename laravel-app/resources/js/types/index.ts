@@ -74,6 +74,7 @@ export interface StatusLog {
 
 export interface Report {
   id: string;
+  trackingCode?: string;
   title: string;
   description: string;
   category: ReportCategory;
@@ -85,8 +86,11 @@ export interface Report {
   kelurahan?: Pick<Kelurahan, 'id' | 'name' | 'kecamatan'>;
   kecamatan?: string;
   skorUrgensi: number;
+  upvotesCount?: number;
   urgensiKeywords: string[];
   photos: string[];
+  completionPhotos?: string[];
+  completionNote?: string;
   audioUrl?: string;
   audioTranscript?: string;
   userId: string;
@@ -94,6 +98,7 @@ export interface Report {
   statusLogs?: StatusLog[];
   createdAt: string;
   updatedAt: string;
+  resolvedAt?: string;
 }
 
 export interface PaginatedReports {

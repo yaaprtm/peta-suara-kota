@@ -243,23 +243,173 @@ class ReportController extends Controller
         $oldStatus = $report->status;
         $newStatus = $request->status;
 
-        $report->update(['status' => $newStatus]);
+        $updateData = ['status' => $newStatus];
+
+        if ($newStatus === 'SELESAI') {
+            $updateData['resolved_at'] = now();
+            if ($request->filled('completion_note')) {
+                $updateData['completion_note'] = $request->completion_note;
+            } elseif ($request->filled('note')) {
+                $updateData['completion_note'] = $request->note;
+            }
+
+            $compPhotos = $report->completion_photos ?? [];
+            if ($request->hasFile('completion_photos')) {
+                foreach ($request->file('completion_photos') as $file) {
+                    $compPhotos[] = $file->store('photos', 'public');
+                }
+            } elseif ($request->filled('completion_photos')) {
+                $raw = $request->input('completion_photos');
+                if (is_array($raw)) {
+                    $compPhotos = array_values(array_unique(array_merge($compPhotos, $raw)));
+                } elseif (is_string($raw)) {
+                    $compPhotos[] = $raw;
+                }
+            }
+
+            if (!empty($compPhotos)) {
+                $updateData['completion_photos'] = $compPhotos;
+            }
+        }
+
+        $report->update($updateData);
 
         StatusLog::create([
             'report_id' => $report->id,
             'from_status' => $oldStatus,
             'to_status' => $newStatus,
-            'note' => $request->note,
+            'note' => $request->note ?? $request->completion_note,
             'changed_by_id' => $request->user()->id,
             'changed_at' => now(),
         ]);
 
-        $report->load(['user', 'kelurahan']);
+        $report->load(['user', 'kelurahan', 'statusLogs.changedBy']);
 
         return response()->json([
             'message' => 'Status berhasil diperbarui',
             'report' => new ReportResource($report),
         ]);
+    }
+
+    /**
+     * POST /api/reports/{id}/upvote
+     * Citizen upvote / support count
+     */
+    public function upvote(Request $request, string $id): JsonResponse
+    {
+        $report = Report::find($id);
+        if (!$report) {
+            return response()->json(['message' => 'Laporan tidak ditemukan'], 404);
+        }
+
+        $report->increment('upvotes_count');
+
+        return response()->json([
+            'message' => 'Dukungan berhasil ditambahkan',
+            'upvotesCount' => $report->upvotes_count,
+            'report' => new ReportResource($report),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/track/{code}
+     * Quick public ticket search
+     */
+    public function track(string $code): JsonResponse
+    {
+        $code = trim($code);
+        $cleanCode = ltrim($code, '#');
+
+        $report = Report::with([
+            'user' => fn($q) => $q->select(['id', 'name', 'avatar']),
+            'kelurahan',
+            'statusLogs.changedBy' => fn($q) => $q->select(['id', 'name', 'role']),
+            'categoryRef',
+        ])
+        ->where('tracking_code', $cleanCode)
+        ->orWhere('id', $cleanCode)
+        ->orWhere('tracking_code', 'LIKE', "%{$cleanCode}%")
+        ->first();
+
+        if (!$report) {
+            return response()->json(['message' => 'Nomor tiket laporan tidak ditemukan.'], 404);
+        }
+
+        return response()->json([
+            'report' => new ReportResource($report),
+        ]);
+    }
+
+    /**
+     * GET /api/reports/export
+     * Official CSV Export for administration & OPD disposition
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $query = Report::with(['kelurahan', 'user'])->orderByDesc('created_at');
+
+        if ($cat = $request->query('category')) {
+            $query->where('category', $cat);
+        }
+        if ($st = $request->query('status')) {
+            $query->where('status', $st);
+        }
+
+        $reports = $query->limit(1000)->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="rekap-pengaduan-surabaya-' . now()->format('Ymd-His') . '.csv"',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        return response()->stream(function () use ($reports) {
+            $handle = fopen('php://output', 'w');
+            // Write UTF-8 BOM for Microsoft Excel compatibility
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            fputcsv($handle, [
+                'No. Tiket',
+                'Tanggal Laporan',
+                'Judul Aduan',
+                'Kategori',
+                'Kecamatan',
+                'Kelurahan',
+                'Alamat Lengkap',
+                'Latitude',
+                'Longitude',
+                'Skor Urgensi',
+                'Level Urgensi',
+                'Dukungan Warga',
+                'Status',
+                'Waktu Selesai',
+                'Pelapor',
+            ]);
+
+            foreach ($reports as $r) {
+                fputcsv($handle, [
+                    $r->tracking_code ?? ('PSK-' . strtoupper(substr(str_replace('-', '', (string) $r->id), 0, 8))),
+                    $r->created_at ? $r->created_at->format('Y-m-d H:i') : '-',
+                    $r->title,
+                    $r->category,
+                    $r->kecamatan ?? $r->kelurahan?->kecamatan ?? '-',
+                    $r->kelurahan?->name ?? '-',
+                    $r->address ?? '-',
+                    $r->latitude,
+                    $r->longitude,
+                    $r->skor_urgensi,
+                    strtoupper($r->urgency_level ?? 'SEDANG'),
+                    $r->upvotes_count ?? 0,
+                    $r->status,
+                    $r->resolved_at ? $r->resolved_at->format('Y-m-d H:i') : ($r->status === 'SELESAI' ? 'Selesai' : '-'),
+                    $r->user?->name ?? 'Warga Surabaya',
+                ]);
+            }
+
+            fclose($handle);
+        }, 200, $headers);
     }
 
     /**

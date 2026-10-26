@@ -16,6 +16,7 @@ class Report extends Model
     protected $table = 'reports';
 
     protected $fillable = [
+        'tracking_code',
         'title',
         'description',
         'category',
@@ -26,17 +27,30 @@ class Report extends Model
         'kelurahan_id',
         'kecamatan',
         'skor_urgensi',
+        'upvotes_count',
         'urgensi_keywords',
         'photos',
+        'completion_photos',
+        'completion_note',
         'audio_url',
         'audio_transcript',
         'user_id',
         'category_id',
+        'resolved_at',
     ];
 
     protected $appends = [
         'urgency_level',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Report $report) {
+            if (empty($report->tracking_code)) {
+                $report->tracking_code = 'PSK-SBY-' . strtoupper(substr(str_replace('-', '', (string) \Illuminate\Support\Str::uuid()), 0, 6));
+            }
+        });
+    }
 
     protected function casts(): array
     {
@@ -44,8 +58,11 @@ class Report extends Model
             'latitude' => 'float',
             'longitude' => 'float',
             'skor_urgensi' => 'integer',
+            'upvotes_count' => 'integer',
             'urgensi_keywords' => 'array',
             'photos' => 'array',
+            'completion_photos' => 'array',
+            'resolved_at' => 'datetime',
         ];
     }
 

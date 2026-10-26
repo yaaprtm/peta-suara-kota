@@ -516,14 +516,15 @@ const PetugasDashboardPage: React.FC = () => {
               </div>
             </div>
             <div className="bg-slate-50 px-5 py-3 border-t border-slate-200 flex items-center justify-between">
-              <span className="text-[11px] text-slate-500">{t('petugas.rekapAutoUpdate')}</span>
-              <button
-                onClick={() => { toast.success(t('petugas.toastExport')); setShowRekapModal(false); }}
-                className="btn-navy py-1.5 px-4 text-xs flex items-center gap-1.5"
+              <a
+                href="/api/reports/export"
+                download
+                onClick={() => setShowRekapModal(false)}
+                className="btn-navy py-1.5 px-4 text-xs flex items-center gap-1.5 font-semibold"
               >
                 <IconFileSpreadsheet className="w-4 h-4 text-orange" />
                 <span>{t('petugas.rekapExport')}</span>
-              </button>
+              </a>
             </div>
           </div>
         </div>

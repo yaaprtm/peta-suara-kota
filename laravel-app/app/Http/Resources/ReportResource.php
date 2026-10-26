@@ -16,6 +16,7 @@ class ReportResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'trackingCode' => $this->tracking_code ?? ('PSK-' . strtoupper(substr(str_replace('-', '', (string) $this->id), 0, 8))),
             'title' => $this->title,
             'description' => $this->description,
             'category' => $this->category,
@@ -26,15 +27,19 @@ class ReportResource extends JsonResource
             'kelurahanId' => $this->kelurahan_id,
             'kecamatan' => $this->kecamatan,
             'skorUrgensi' => (int) $this->skor_urgensi,
+            'upvotesCount' => (int) ($this->upvotes_count ?? 0),
             'urgensiKeywords' => $this->urgensi_keywords ?? [],
             'urgencyLevel' => $this->urgency_level,
             'photos' => $this->photos ?? [],
+            'completionPhotos' => $this->completion_photos ?? [],
+            'completionNote' => $this->completion_note,
             'audioUrl' => $this->audio_url,
             'audioTranscript' => $this->audio_transcript,
             'userId' => $this->user_id,
             'categoryId' => $this->category_id,
             'createdAt' => $this->created_at?->toISOString(),
             'updatedAt' => $this->updated_at?->toISOString(),
+            'resolvedAt' => $this->resolved_at?->toISOString(),
             'user' => $this->whenLoaded('user', function () {
                 return [
                     'id' => $this->user->id,
