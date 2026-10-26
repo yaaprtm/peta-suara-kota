@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { router } from '@inertiajs/react';
 import {
   IconTestPipe,
   IconUser,
@@ -21,8 +21,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { LanguageToggleDark } from './LanguageToggle';
 
 export const TestingBar: React.FC = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate = (url: string) => router.visit(url);
   const { user, loginAsRole, logout } = useAuthStore();
   const { resetReports } = useReportsStore();
   const { t } = useTranslation();
