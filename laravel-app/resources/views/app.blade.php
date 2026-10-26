@@ -19,7 +19,6 @@
         <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.css" />
 
         <!-- Scripts -->
-        @routes
         @viteReactRefresh
         @vite(['resources/js/app.tsx', "resources/js/Pages/{$page['component']}.tsx"])
         @inertiaHead

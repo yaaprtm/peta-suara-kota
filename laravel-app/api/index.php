@@ -24,6 +24,8 @@ $_ENV['VIEW_COMPILED_PATH'] = "{$storagePath}/framework/views";
 
 $_SERVER['SCRIPT_NAME'] = '/index.php';
 $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/../public/index.php';
+$_SERVER['HTTPS'] = 'on';
+$_SERVER['SERVER_PORT'] = '443';
 
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '1');
