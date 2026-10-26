@@ -22,7 +22,10 @@ $_ENV['APP_STORAGE'] = $storagePath;
 putenv("VIEW_COMPILED_PATH={$storagePath}/framework/views");
 $_ENV['VIEW_COMPILED_PATH'] = "{$storagePath}/framework/views";
 
-ini_set('display_errors', '1');
+$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/../public/index.php';
+
+ini_set('display_errors', '0');
 ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 
