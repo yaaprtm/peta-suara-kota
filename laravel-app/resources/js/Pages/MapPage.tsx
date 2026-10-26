@@ -43,6 +43,15 @@ const MapPage: React.FC = () => {
   const [isConnected, setIsConnected] = useState(true);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('lapor') === 'true') {
+        setIsFormOpen(true);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const es = createSSEConnection(
       (report) => {
         addReport(report as Report);

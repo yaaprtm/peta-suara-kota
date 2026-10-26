@@ -120,13 +120,15 @@ const en = {
     mobileFlow: 'How It Works',
     mobileMap: 'Public City Map',
     mobileLeaderboard: 'Village Leaderboard',
-    heroBadge: 'Aspiration Platform & Reporting Command Center for Surabaya',
+    heroBadge: 'Citizen Aspiration and Reporting Platform for Surabaya',
     heroTitle1: 'Voice Your City Complaints,',
     heroTitle2: 'Handled Fast & Transparently.',
     heroDesc: 'Report potholes, floods, garbage piles, and broken street lights using just your voice or a photo. Directly connected to relevant city departments and officers.',
-    btnWarga: 'Citizen Home (/dashboard)',
-    btnPetugas: 'Officer Command Center (/petugas)',
-    btnSuperadmin: 'Superadmin Panel (/superadmin)',
+    btnViewMap: 'View Report Map',
+    btnCreateReport: 'Create Report',
+    btnWarga: 'Citizen Home',
+    btnPetugas: 'Officer Panel',
+    btnSuperadmin: 'Admin Panel',
     kpiTotal: 'TOTAL CITY REPORTS',
     kpiTotalSub: 'Across Surabaya',
     kpiDone: 'RESOLVED',
@@ -310,8 +312,8 @@ const en = {
 
   // ── Petugas Dashboard ─────────────────────────────────────────────────────────
   petugas: {
-    headerTitle: 'SURABAYA OFFICER COMMAND CENTER',
-    liveTag: 'LIVE RADAR',
+    headerTitle: 'SURABAYA OFFICER PANEL',
+    liveTag: 'OFFICER PANEL',
     headerSubtitle: 'Officer: {{name}} · Unified Urgency Queue',
     rekapBtn: 'Daily Report Summary',
     refreshTitle: 'Refresh Data',
@@ -372,8 +374,8 @@ const en = {
 
   // ── Superadmin Dashboard ──────────────────────────────────────────────────────
   superadmin: {
-    headerTitle: 'SURABAYA CITY SUPERADMIN PANEL',
-    controlTag: 'CONTROL CENTER',
+    headerTitle: 'SURABAYA CITY ADMIN PANEL',
+    controlTag: 'ADMIN PANEL',
     headerSubtitle: 'User: {{name}} · Full City Access',
     masterDataBtn: 'Manage Master Data',
     statsTitle: 'Surabaya City-wide Statistics',

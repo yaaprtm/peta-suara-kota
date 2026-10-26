@@ -24,6 +24,14 @@ const LoginPage: React.FC = () => {
   const { t } = useTranslation();
 
   const redirectByRole = (role?: string) => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      if (redirect) {
+        navigate(redirect);
+        return;
+      }
+    }
     if (role === 'PETUGAS') navigate('/petugas');
     else if (role === 'SUPERADMIN' || role === 'ADMIN') navigate('/superadmin');
     else navigate('/dashboard');
@@ -41,10 +49,24 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleDemo = (role: 'WARGA' | 'PETUGAS' | 'SUPERADMIN') => {
-    const user = loginAsRole(role);
-    toast.success(t('auth.demoLogin', { role }));
-    redirectByRole(user.role);
+  const handleDemo = async (role: 'WARGA' | 'PETUGAS' | 'SUPERADMIN') => {
+    const demoCreds = {
+      WARGA: { email: 'warga@surabaya.go.id', password: 'password123' },
+      PETUGAS: { email: 'petugas@surabaya.go.id', password: 'password123' },
+      SUPERADMIN: { email: 'superadmin@surabaya.go.id', password: 'password123' },
+    };
+    const cred = demoCreds[role];
+    setEmail(cred.email);
+    setPassword(cred.password);
+    try {
+      const loggedUser = await login(cred.email, cred.password);
+      toast.success(t('auth.demoLogin', { role }));
+      redirectByRole(loggedUser.role);
+    } catch {
+      const user = loginAsRole(role);
+      toast.success(t('auth.demoLogin', { role }));
+      redirectByRole(user.role);
+    }
   };
 
   return (
