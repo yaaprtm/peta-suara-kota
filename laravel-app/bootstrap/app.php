@@ -26,5 +26,17 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+        $exceptions->respond(function ($response, Throwable $e) {
+            if (request()->has('debug') || env('APP_DEBUG')) {
+                return response(
+                    "ERROR: " . $e->getMessage() . "\n" .
+                    "FILE: " . $e->getFile() . ":" . $e->getLine() . "\n\n" .
+                    $e->getTraceAsString(),
+                    500,
+                    ['Content-Type' => 'text/plain']
+                );
+            }
+            return $response;
+        });
     })->create()
     ->useStoragePath(isset($_ENV['APP_STORAGE']) ? $_ENV['APP_STORAGE'] : (is_writable(dirname(__DIR__).'/storage') ? dirname(__DIR__).'/storage' : '/tmp/storage'));
