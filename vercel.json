@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "framework": null,
+  "functions": {
+    "laravel-app/api/index.php": {
+      "runtime": "vercel-php@0.7.4"
+    }
+  },
+  "routes": [
+    {
+      "src": "/build/(.*)",
+      "dest": "/laravel-app/public/build/$1"
+    },
+    {
+      "src": "/data/(.*)",
+      "dest": "/laravel-app/public/data/$1"
+    },
+    {
+      "src": "/favicon.ico",
+      "dest": "/laravel-app/public/favicon.ico"
+    },
+    {
+      "src": "/favicon.svg",
+      "dest": "/laravel-app/public/favicon.svg"
+    },
+    {
+      "src": "/robots.txt",
+      "dest": "/laravel-app/public/robots.txt"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/laravel-app/api/index.php"
+    }
+  ]
+}
