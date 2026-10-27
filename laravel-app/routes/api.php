@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\KelurahanController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\StatsController;
+use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web'])->group(function () {
@@ -19,7 +20,11 @@ Route::middleware(['web'])->group(function () {
     Route::prefix('reports')->group(function () {
         Route::get('viewport', [ReportController::class, 'viewport']);
         Route::get('stream', [ReportController::class, 'stream']);
-        Route::get('export', [ReportController::class, 'export']);
+        
+        // Export requires ADMIN or SUPERADMIN
+        Route::get('export', [ReportController::class, 'export'])
+            ->middleware(['auth', 'role:ADMIN,SUPERADMIN']);
+        
         Route::get('track/{code}', [ReportController::class, 'track']);
         Route::post('{id}/upvote', [ReportController::class, 'upvote']);
         Route::get('/', [ReportController::class, 'index']);
@@ -28,13 +33,22 @@ Route::middleware(['web'])->group(function () {
         // Protected report actions
         Route::middleware(['auth'])->group(function () {
             Route::post('/', [ReportController::class, 'store'])->middleware('throttle:10,1');
-            Route::patch('{id}/status', [ReportController::class, 'updateStatus']);
+            
+            // Get valid status transitions
+            Route::get('{id}/status/transitions', [ReportController::class, 'getValidTransitions']);
+            
+            // Only PETUGAS, ADMIN, SUPERADMIN can update status
+            Route::patch('{id}/status', [ReportController::class, 'updateStatus'])
+                ->middleware('role:PETUGAS,ADMIN,SUPERADMIN');
+            
+            // Owner, ADMIN, SUPERADMIN can delete
             Route::delete('{id}', [ReportController::class, 'destroy']);
         });
     });
 
     // Kelurahans endpoints
     Route::prefix('kelurahans')->group(function () {
+        Route::get('geo/bounds', [KelurahanController::class, 'geoBounds']);
         Route::get('/', [KelurahanController::class, 'index']);
         Route::get('{id}', [KelurahanController::class, 'show']);
     });
@@ -43,5 +57,12 @@ Route::middleware(['web'])->group(function () {
     Route::prefix('stats')->group(function () {
         Route::get('overview', [StatsController::class, 'overview']);
         Route::get('leaderboard', [StatsController::class, 'leaderboard']);
+    });
+
+    // User management endpoints (ADMIN/SUPERADMIN only)
+    Route::middleware(['auth', 'role:ADMIN,SUPERADMIN'])->prefix('users')->group(function () {
+        Route::get('/', [UserController::class, 'index']);
+        Route::patch('{id}/role', [UserController::class, 'updateRole']);
+        Route::patch('{id}/toggle-active', [UserController::class, 'toggleActive']);
     });
 });

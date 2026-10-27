@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
   IconBuildingCommunity,
@@ -18,12 +18,20 @@ import {
   IconDatabase,
 } from '@tabler/icons-react';
 import { useAuthStore } from '@/stores/authStore';
-import { useReportsStore } from '@/stores/reportsStore';
-import { reportsApi } from '@/lib/api';
-import { User } from '@/types';
+import { statsApi, reportsApi } from '@/lib/api';
+import { OverviewStats, User } from '@/types';
 import toast from 'react-hot-toast';
 import { useTranslation } from '@/i18n/useTranslation';
 import LanguageToggle from '@/Components/ui/LanguageToggle';
+
+// ─── KPI Skeleton ──────────────────────────────────────────────────────────────
+const KpiSkeleton: React.FC = () => (
+  <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs animate-pulse">
+    <div className="h-3 w-24 bg-slate-200 rounded mb-2" />
+    <div className="h-7 w-16 bg-slate-200 rounded mb-1" />
+    <div className="h-2.5 w-20 bg-slate-100 rounded" />
+  </div>
+);
 
 const LandingPage: React.FC = () => {
   const navigate = (url: string) => router.visit(url);
@@ -31,16 +39,40 @@ const LandingPage: React.FC = () => {
   const { user, logout } = useAuthStore();
   const currentUser = props.auth?.user || user;
 
-  const { reports } = useReportsStore();
   const { t } = useTranslation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
-  const totalReports = reports.length;
-  const completedReports = reports.filter(r => r.status === 'SELESAI').length;
-  const criticalReports = reports.filter(r => r.skorUrgensi >= 80).length;
+  // ─── Live stats from API ───────────────────────────────────────────────────
+  const [stats, setStats] = useState<OverviewStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const fetchStats = () => {
+    statsApi.overview()
+      .then((data: any) => {
+        if (data && typeof data.total === 'number') {
+          setStats(data as OverviewStats);
+        }
+      })
+      .catch(() => {
+        // Keep stats null — fallback text shown
+      })
+      .finally(() => setStatsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchStats();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchStats, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const totalReports = stats?.total ?? 0;
+  const completedReports = stats?.selesai ?? 0;
+  const resolutionPct = totalReports > 0 ? Math.round((completedReports / totalReports) * 100) : 0;
+  const criticalReports = stats?.highUrgency ?? 0;
 
   const handleLogout = async () => {
     try {
@@ -289,29 +321,44 @@ const LandingPage: React.FC = () => {
 
           {/* KPI Counters */}
           <div className="pt-8 max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3 text-left">
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-500 block">{t('landing.kpiTotal')}</span>
-              <span className="text-xl sm:text-2xl font-bold text-navy">{totalReports}+</span>
-              <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiTotalSub')}</span>
-            </div>
+            {statsLoading ? (
+              <>
+                <KpiSkeleton />
+                <KpiSkeleton />
+                <KpiSkeleton />
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-orange block">{t('landing.kpiCoverage')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-navy">{t('landing.kpiCoverageSub1')}</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block">{t('landing.kpiTotal')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-navy">{totalReports}+</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiTotalSub')}</span>
+                </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <span className="text-[11px] font-semibold text-emerald-600 block">{t('landing.kpiDone')}</span>
-              <span className="text-xl sm:text-2xl font-bold text-emerald-700">{completedReports} {t('landing.kpiDoneUnit')}</span>
-              <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiDoneSub')}</span>
-            </div>
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-emerald-600 block">{t('landing.kpiDone')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-emerald-700">{resolutionPct}%</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{completedReports} {t('landing.kpiDoneUnit')}</span>
+                </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <span className="text-[11px] font-semibold text-red-600 block">{t('landing.kpiCritical')}</span>
-              <span className="text-xl sm:text-2xl font-bold text-red-700">{criticalReports} {t('landing.kpiCasesUnit')}</span>
-              <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCriticalSub')}</span>
-            </div>
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-red-600 block">{t('landing.kpiCritical')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-red-700">{criticalReports} {t('landing.kpiCasesUnit')}</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCriticalSub')}</span>
+                </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <span className="text-[11px] font-semibold text-orange block">{t('landing.kpiCoverage')}</span>
-              <span className="text-xl sm:text-2xl font-bold text-navy">{t('landing.kpiCoverageSub1')}</span>
-              <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
-            </div>
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-orange block">{t('landing.kpiCoverage')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-navy">{t('landing.kpiCoverageSub1')}</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>

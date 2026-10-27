@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link, router } from '@inertiajs/react';
 import {
   IconShield,
@@ -27,7 +27,7 @@ import { useTranslation } from '@/i18n/useTranslation';
 const PetugasDashboardPage: React.FC = () => {
   const navigate = (url: string) => router.visit(url);
   const { user } = useAuthStore();
-  const { reports, updateReportStatus } = useReportsStore();
+  const { reports, updateReportStatus, fetchReports } = useReportsStore();
   const { t } = useTranslation();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,6 +40,11 @@ const PetugasDashboardPage: React.FC = () => {
   const [actionNote, setActionNote] = useState('');
   const [showRekapModal, setShowRekapModal] = useState(false);
   const [mobileTab, setMobileTab] = useState<'queue' | 'map'>('queue');
+
+  // Fetch reports from API on mount
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   const sortedAndFilteredReports = useMemo(() => {
     return reports

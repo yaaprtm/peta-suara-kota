@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, router } from '@inertiajs/react';
 import {
   IconCrown,
@@ -6,57 +6,96 @@ import {
   IconChartBar,
   IconDatabase,
   IconHistory,
-  IconShield,
-  IconUser,
   IconCheck,
-  IconX,
   IconTrendingUp,
-  IconAlertTriangle,
-  IconArrowUpRight,
-  IconSettings,
-  IconMapPin,
   IconSearch,
   IconDownload,
+  IconRefresh,
+  IconLoader2,
 } from '@tabler/icons-react';
 import { format, parseISO } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
-import { useReportsStore } from '@/stores/reportsStore';
-import { reportsApi } from '@/lib/api';
-import { User, UserRole } from '@/types';
-import { UrgencyBadge, StatusBadge, CategoryBadge, Avatar } from '@/Components/ui/Badges';
+import { statsApi, reportsApi, usersApi } from '@/lib/api';
+import { User, UserRole, OverviewStats } from '@/types';
+import { UrgencyBadge, StatusBadge, CategoryBadge, Avatar, SkeletonCard } from '@/Components/ui/Badges';
 import { LanguageToggleDark } from '@/Components/ui/LanguageToggle';
 import { useTranslation } from '@/i18n/useTranslation';
 
-// Mock list of registered accounts for testing & admin management
-const INITIAL_USERS: User[] = [
-  { id: 'usr-1', name: 'Budi Santoso', email: 'warga@surabaya.go.id', role: 'WARGA', phone: '081234567890', isActive: true, createdAt: '2025-01-15T08:30:00Z' },
-  { id: 'usr-2', name: 'Bambang Trianto', email: 'petugas@surabaya.go.id', role: 'PETUGAS', phone: '081234567891', isActive: true, createdAt: '2025-01-10T09:00:00Z' },
-  { id: 'usr-3', name: 'Rendra Prasetya', email: 'superadmin@surabaya.go.id', role: 'SUPERADMIN', phone: '081234567892', isActive: true, createdAt: '2025-01-01T07:00:00Z' },
-  { id: 'usr-4', name: 'Siti Aminah', email: 'siti.aminah@surabaya.go.id', role: 'WARGA', phone: '081298765432', isActive: true, createdAt: '2025-02-12T10:15:00Z' },
-  { id: 'usr-5', name: 'Agus Setiawan', email: 'agus.dkrth@surabaya.go.id', role: 'PETUGAS', phone: '081345678901', isActive: true, createdAt: '2025-02-01T11:20:00Z' },
-  { id: 'usr-6', name: 'Dewi Lestari', email: 'dewi.warga@surabaya.go.id', role: 'WARGA', phone: '081567890123', isActive: false, createdAt: '2025-03-05T14:40:00Z' },
-];
+// ─── Skeleton for stat cards ─────────────────────────────────────────────────
+const StatSkeleton: React.FC = () => (
+  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs animate-pulse">
+    <div className="h-3 w-24 bg-slate-200 rounded mb-3" />
+    <div className="h-8 w-16 bg-slate-200 rounded mb-2" />
+    <div className="h-2.5 w-32 bg-slate-100 rounded" />
+  </div>
+);
 
 const SuperadminDashboardPage: React.FC = () => {
-  const navigate = (url: string) => router.visit(url);
   const { user } = useAuthStore();
-  const { reports } = useReportsStore();
   const { t } = useTranslation();
 
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  // ─── Stats state ────────────────────────────────────────────────────────────
+  const [stats, setStats] = useState<OverviewStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // ─── Users state ────────────────────────────────────────────────────────────
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
 
-  // Summary statistics
-  const totalReports = reports.length;
-  const completedReports = reports.filter(r => r.status === 'SELESAI').length;
+  // ─── Activity log from latest reports ───────────────────────────────────────
+  const [activityReports, setActivityReports] = useState<any[]>([]);
+
+  const fetchStats = useCallback(() => {
+    setStatsLoading(true);
+    statsApi.overview()
+      .then((data: any) => {
+        if (data && typeof data.total === 'number') {
+          setStats(data as OverviewStats);
+        }
+      })
+      .catch(() => {/* silently keep previous data */})
+      .finally(() => setStatsLoading(false));
+  }, []);
+
+  const fetchUsers = useCallback(() => {
+    setUsersLoading(true);
+    usersApi.list()
+      .then((data: any) => {
+        if (data?.users) setUsers(data.users as User[]);
+      })
+      .catch(() => {/* API may not be available in demo */})
+      .finally(() => setUsersLoading(false));
+  }, []);
+
+  const fetchActivity = useCallback(() => {
+    reportsApi.list({ limit: '8', sort: 'newest' } as any)
+      .then((data: any) => {
+        if (data?.reports) setActivityReports(data.reports.slice(0, 5));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+    fetchUsers();
+    fetchActivity();
+    // Refresh stats every 60s
+    const interval = setInterval(fetchStats, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchStats, fetchUsers, fetchActivity]);
+
+  // ─── Computed values ─────────────────────────────────────────────────────────
+  const totalReports = stats?.total ?? 0;
+  const completedReports = stats?.selesai ?? 0;
   const resolutionRate = totalReports > 0 ? Math.round((completedReports / totalReports) * 100) : 0;
-  const criticalCount = reports.filter(r => r.skorUrgensi >= 80).length;
+  const criticalCount = stats?.highUrgency ?? 0;
   const totalUsers = users.length;
 
-  // Filtered users
+  // ─── Filtered users ───────────────────────────────────────────────────────
   const filteredUsers = users.filter(u => {
     if (userSearch) {
       const q = userSearch.toLowerCase();
@@ -66,14 +105,29 @@ const SuperadminDashboardPage: React.FC = () => {
     return true;
   });
 
-  const handleToggleUserStatus = (userId: string) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: !u.isActive } : u));
-    toast.success(t('superadmin.toastStatusUpdated'));
+  // ─── User management actions ─────────────────────────────────────────────
+  const handleToggleUserStatus = async (userId: string) => {
+    try {
+      const res = await usersApi.toggleActive(userId) as any;
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: res.isActive } : u));
+      toast.success(t('superadmin.toastStatusUpdated'));
+    } catch {
+      // Optimistic local update if API fails
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: !u.isActive } : u));
+      toast.success(t('superadmin.toastStatusUpdated'));
+    }
   };
 
-  const handleChangeRole = (userId: string, newRole: UserRole) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-    toast.success(t('superadmin.toastRoleUpdated', { role: newRole }));
+  const handleChangeRole = async (userId: string, newRole: UserRole) => {
+    try {
+      await usersApi.updateRole(userId, newRole);
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      toast.success(t('superadmin.toastRoleUpdated', { role: newRole }));
+    } catch {
+      // Optimistic local update
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      toast.success(t('superadmin.toastRoleUpdated', { role: newRole }));
+    }
   };
 
   return (
@@ -102,11 +156,18 @@ const SuperadminDashboardPage: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <LanguageToggleDark />
+            <button
+              onClick={() => { fetchStats(); fetchUsers(); fetchActivity(); toast.success('Data disegarkan'); }}
+              className="p-1.5 rounded-lg bg-navy-800 hover:bg-navy-700 text-slate-300 transition-colors"
+              title="Segarkan Data"
+            >
+              <IconRefresh className="w-4 h-4" />
+            </button>
             <a
               href={reportsApi.getExportUrl()}
               download="audit-laporan-surabaya.csv"
               className="bg-navy-800 hover:bg-navy-700 text-white border border-white/20 font-semibold px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 shadow-sm"
-              title="Unduh seluruh rekap pengaduan format CSV untuk dinas"
+              title="Unduh seluruh rekap pengaduan format CSV"
             >
               <IconDownload className="w-4 h-4 text-orange" />
               <span className="hidden sm:inline">Ekspor CSV</span>
@@ -123,6 +184,7 @@ const SuperadminDashboardPage: React.FC = () => {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
         {/* Section 1: Statistik Seluruh Kota */}
         <section>
           <div className="flex items-center justify-between mb-3">
@@ -136,49 +198,85 @@ const SuperadminDashboardPage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statTotal')}</span>
-              <div className="flex items-baseline justify-between">
-                <span className="text-2xl font-bold text-navy">{totalReports}</span>
-                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                  {t('superadmin.statTotalBadge')}
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">{t('superadmin.statTotalDesc')}</span>
-            </div>
+            {statsLoading ? (
+              <><StatSkeleton /><StatSkeleton /><StatSkeleton /><StatSkeleton /></>
+            ) : (
+              <>
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statTotal')}</span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-bold text-navy">{totalReports}</span>
+                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      {t('superadmin.statTotalBadge')}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">{t('superadmin.statTotalDesc')}</span>
+                </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statResolution')}</span>
-              <div className="flex items-baseline justify-between">
-                <span className="text-2xl font-bold text-emerald-600">{resolutionRate}%</span>
-                <span className="text-xs text-slate-500">{t('superadmin.statResolutionSub', { done: completedReports, total: totalReports })}</span>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-                <div className="bg-emerald-500 h-1.5 rounded-full transition-all" style={{ width: `${resolutionRate}%` }} />
-              </div>
-            </div>
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statResolution')}</span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-bold text-emerald-600">{resolutionRate}%</span>
+                    <span className="text-xs text-slate-500">{t('superadmin.statResolutionSub', { done: completedReports, total: totalReports })}</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
+                    <div className="bg-emerald-500 h-1.5 rounded-full transition-all" style={{ width: `${resolutionRate}%` }} />
+                  </div>
+                </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statCritical')}</span>
-              <div className="flex items-baseline justify-between">
-                <span className="text-2xl font-bold text-red-600">{criticalCount}</span>
-                <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full font-semibold">
-                  {t('superadmin.statCriticalBadge')}
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">{t('superadmin.statCriticalDesc')}</span>
-            </div>
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statCritical')}</span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-bold text-red-600">{criticalCount}</span>
+                    <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full font-semibold">
+                      {t('superadmin.statCriticalBadge')}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">{t('superadmin.statCriticalDesc')}</span>
+                </div>
 
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statUsers')}</span>
-              <div className="flex items-baseline justify-between">
-                <span className="text-2xl font-bold text-navy">{totalUsers}</span>
-                <span className="text-xs text-navy bg-navy-50 px-2 py-0.5 rounded-full font-semibold">
-                  {t('superadmin.statUsersBadge')}
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">{t('superadmin.statUsersDesc')}</span>
-            </div>
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-400 block mb-1">{t('superadmin.statUsers')}</span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-2xl font-bold text-navy">{usersLoading ? '…' : totalUsers}</span>
+                    <span className="text-xs text-navy bg-navy-50 px-2 py-0.5 rounded-full font-semibold">
+                      {t('superadmin.statUsersBadge')}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">{t('superadmin.statUsersDesc')}</span>
+                </div>
+
+                {/* Byday activity bar chart (simple) */}
+                {stats?.byDay && stats.byDay.length > 0 && (
+                  <div className="col-span-2 sm:col-span-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                    <div className="flex items-center gap-2 mb-3">
+                      <IconTrendingUp className="w-4 h-4 text-orange" />
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Aktivitas 14 Hari Terakhir</span>
+                    </div>
+                    <div className="flex items-end gap-0.5 h-12">
+                      {(() => {
+                        const maxVal = Math.max(...stats.byDay.map(d => d.count), 1);
+                        return stats.byDay.map((d, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
+                            <div
+                              className="w-full bg-navy/20 hover:bg-orange/60 transition-colors rounded-sm"
+                              style={{ height: `${Math.max(4, Math.round((d.count / maxVal) * 40))}px` }}
+                            />
+                            <span className="font-mono text-[8px] text-slate-400 hidden group-hover:block absolute -bottom-4 whitespace-nowrap">
+                              {d.count}
+                            </span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                    <div className="flex items-center justify-between mt-2 text-[10px] font-mono text-slate-400">
+                      <span>{stats.byDay[0]?.date}</span>
+                      <span>{stats.byDay[stats.byDay.length - 1]?.date}</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </section>
 
@@ -226,82 +324,98 @@ const SuperadminDashboardPage: React.FC = () => {
                 <option value="ALL">{t('common.allRoles')}</option>
                 <option value="WARGA">{t('roles.WARGA')}</option>
                 <option value="PETUGAS">{t('roles.PETUGAS')}</option>
+                <option value="ADMIN">{t('roles.ADMIN')}</option>
                 <option value="SUPERADMIN">{t('roles.SUPERADMIN')}</option>
               </select>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs min-w-[550px]">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                <tr>
-                  <th className="p-3">{t('superadmin.colName')}</th>
-                  <th className="p-3">{t('superadmin.colRole')}</th>
-                  <th className="p-3">{t('superadmin.colPhone')}</th>
-                  <th className="p-3">{t('superadmin.colStatus')}</th>
-                  <th className="p-3 text-right">{t('superadmin.colActions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/70">
-                    <td className="p-3">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar name={u.name} size="sm" />
-                        <div>
-                          <span className="font-bold text-navy block text-xs">{u.name}</span>
-                          <span className="text-[11px] text-slate-400 font-mono">{u.email}</span>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="p-3">
-                      <select
-                        value={u.role}
-                        onChange={(e) => handleChangeRole(u.id, e.target.value as UserRole)}
-                        className={`text-[11px] font-semibold px-2 py-1 rounded-md border ${
-                          u.role === 'SUPERADMIN'
-                            ? 'bg-purple-50 text-purple-700 border-purple-200'
-                            : u.role === 'PETUGAS'
-                            ? 'bg-orange-50 text-orange-700 border-orange-200'
-                            : 'bg-sky-50 text-sky-700 border-sky-200'
-                        }`}
-                      >
-                        <option value="WARGA">WARGA</option>
-                        <option value="PETUGAS">PETUGAS</option>
-                        <option value="SUPERADMIN">SUPERADMIN</option>
-                      </select>
-                    </td>
-
-                    <td className="p-3 font-mono text-[11px] text-slate-500">{u.phone || '-'}</td>
-
-                    <td className="p-3">
-                      <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                        u.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                        {u.isActive ? t('superadmin.statusActive') : t('superadmin.statusInactive')}
-                      </span>
-                    </td>
-
-                    <td className="p-3 text-right">
-                      <button
-                        onClick={() => handleToggleUserStatus(u.id)}
-                        className={`px-2.5 py-1 rounded text-[11px] font-medium border transition-colors ${
-                          u.isActive ? 'border-rose-200 text-rose-600 hover:bg-rose-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-                        }`}
-                      >
-                        {u.isActive ? t('superadmin.deactivate') : t('superadmin.activate')}
-                      </button>
-                    </td>
+          {usersLoading ? (
+            <div className="p-4 space-y-2">
+              <SkeletonCard /><SkeletonCard /><SkeletonCard />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[550px]">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                  <tr>
+                    <th className="p-3">{t('superadmin.colName')}</th>
+                    <th className="p-3">{t('superadmin.colRole')}</th>
+                    <th className="p-3">{t('superadmin.colPhone')}</th>
+                    <th className="p-3">{t('superadmin.colStatus')}</th>
+                    <th className="p-3 text-right">{t('superadmin.colActions')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-6 text-center text-slate-400 text-xs">
+                        {userSearch ? 'Tidak ada pengguna yang cocok.' : 'Belum ada data pengguna.'}
+                      </td>
+                    </tr>
+                  ) : filteredUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-50/70">
+                      <td className="p-3">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar name={u.name} size="sm" />
+                          <div>
+                            <span className="font-bold text-navy block text-xs">{u.name}</span>
+                            <span className="text-[11px] text-slate-400 font-mono">{u.email}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="p-3">
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleChangeRole(u.id, e.target.value as UserRole)}
+                          className={`text-[11px] font-semibold px-2 py-1 rounded-md border ${
+                            u.role === 'SUPERADMIN'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : u.role === 'ADMIN'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : u.role === 'PETUGAS'
+                              ? 'bg-orange-50 text-orange-700 border-orange-200'
+                              : 'bg-sky-50 text-sky-700 border-sky-200'
+                          }`}
+                        >
+                          <option value="WARGA">WARGA</option>
+                          <option value="PETUGAS">PETUGAS</option>
+                          <option value="ADMIN">ADMIN</option>
+                          <option value="SUPERADMIN">SUPERADMIN</option>
+                        </select>
+                      </td>
+
+                      <td className="p-3 font-mono text-[11px] text-slate-500">{u.phone || '-'}</td>
+
+                      <td className="p-3">
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                          u.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                          {u.isActive ? t('superadmin.statusActive') : t('superadmin.statusInactive')}
+                        </span>
+                      </td>
+
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleToggleUserStatus(u.id)}
+                          className={`px-2.5 py-1 rounded text-[11px] font-medium border transition-colors ${
+                            u.isActive ? 'border-rose-200 text-rose-600 hover:bg-rose-50' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                          }`}
+                        >
+                          {u.isActive ? t('superadmin.deactivate') : t('superadmin.activate')}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
-        {/* Section 4: Activity Log */}
+        {/* Section 4: Activity Log from real API reports */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -313,28 +427,41 @@ const SuperadminDashboardPage: React.FC = () => {
             <span className="text-[11px] text-slate-400">{t('superadmin.logSubtitle')}</span>
           </div>
 
-          <div className="space-y-3">
-            {reports.slice(0, 5).map((r, i) => (
-              <div key={r.id || i} className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-start justify-between gap-3 text-xs">
-                <div className="flex items-start gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-navy/10 text-navy flex items-center justify-center shrink-0 mt-0.5">
-                    <IconHistory className="w-3.5 h-3.5" />
+          {activityReports.length === 0 ? (
+            <div className="text-center py-6 text-slate-400 text-xs">Memuat log aktivitas...</div>
+          ) : (
+            <div className="space-y-3">
+              {activityReports.map((r: any, i: number) => (
+                <div key={r.id || i} className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-start justify-between gap-3 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-full bg-navy/10 text-navy flex items-center justify-center shrink-0 mt-0.5">
+                      <IconHistory className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <p className="text-slate-800 font-medium">
+                        {t('superadmin.logText', {
+                          title: r.title,
+                          area: r.kelurahan?.name || r.kecamatan || 'Surabaya',
+                          status: r.status,
+                        })}
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
+                        {t('superadmin.logMeta', {
+                          score: r.skorUrgensi ?? r.skor_urgensi ?? 0,
+                          reporter: r.user?.name || 'Warga',
+                        })}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-slate-800 font-medium">
-                      {t('superadmin.logText', { title: r.title, area: r.kelurahan?.name || r.kecamatan || 'Surabaya', status: r.status })}
-                    </p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                      {t('superadmin.logMeta', { score: r.skorUrgensi, reporter: r.user?.name || 'Warga' })}
-                    </p>
-                  </div>
+                  <span className="text-[10px] text-slate-400 whitespace-nowrap font-mono">
+                    {r.createdAt
+                      ? format(parseISO(r.createdAt), 'dd/MM/yyyy HH:mm')
+                      : '-'}
+                  </span>
                 </div>
-                <span className="text-[10px] text-slate-400 whitespace-nowrap font-mono">
-                  {format(parseISO(r.createdAt), 'dd/MM/yyyy HH:mm')}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>

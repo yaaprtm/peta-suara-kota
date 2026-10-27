@@ -2,6 +2,8 @@
   "version": 2,
   "framework": null,
   "outputDirectory": "public",
+  "buildCommand": "npm run vercel-build",
+  "installCommand": "npm install --ignore-scripts",
   "functions": {
     "api/index.php": {
       "runtime": "vercel-php@0.7.4"
@@ -15,6 +17,10 @@
     {
       "src": "/data/(.*)",
       "dest": "/public/data/$1"
+    },
+    {
+      "src": "/storage/(.*)",
+      "dest": "/public/storage/$1"
     },
     {
       "src": "/favicon.ico",
@@ -32,5 +38,14 @@
       "src": "/(.*)",
       "dest": "/api/index.php"
     }
-  ]
+  ],
+  "env": {
+    "APP_ENV": "production",
+    "APP_DEBUG": "false",
+    "LOG_CHANNEL": "stderr",
+    "SESSION_DRIVER": "database",
+    "CACHE_STORE": "database",
+    "QUEUE_CONNECTION": "sync",
+    "FILESYSTEM_DISK": "s3"
+  }
 }
