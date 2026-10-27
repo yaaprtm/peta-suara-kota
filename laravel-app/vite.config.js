@@ -13,15 +13,33 @@ export default defineConfig({
     build: {
         rollupOptions: {
             output: {
-                manualChunks: {
-                    // Split vendor libraries
-                    'vendor-react': ['react', 'react-dom'],
-                    'vendor-inertia': ['@inertiajs/react'],
-                    'vendor-map': ['mapbox-gl', 'react-map-gl'],
-                    'vendor-charts': ['recharts'],
-                    'vendor-ui': ['@headlessui/react', 'clsx'],
-                    'vendor-date': ['date-fns'],
-                    'vendor-i18n': ['i18next', 'react-i18next'],
+                manualChunks(id) {
+                    // Split vendor libraries into separate chunks
+                    if (id.includes('node_modules')) {
+                        if (id.includes('react') || id.includes('react-dom')) {
+                            return 'vendor-react';
+                        }
+                        if (id.includes('@inertiajs')) {
+                            return 'vendor-inertia';
+                        }
+                        if (id.includes('mapbox-gl') || id.includes('react-map-gl')) {
+                            return 'vendor-map';
+                        }
+                        if (id.includes('recharts')) {
+                            return 'vendor-charts';
+                        }
+                        if (id.includes('@headlessui') || id.includes('clsx')) {
+                            return 'vendor-ui';
+                        }
+                        if (id.includes('date-fns')) {
+                            return 'vendor-date';
+                        }
+                        if (id.includes('i18next')) {
+                            return 'vendor-i18n';
+                        }
+                        // Other node_modules
+                        return 'vendor';
+                    }
                 },
             },
         },
@@ -40,7 +58,6 @@ export default defineConfig({
             'react-dom',
             '@inertiajs/react',
             'mapbox-gl',
-            'react-map-gl',
         ],
     },
 });
