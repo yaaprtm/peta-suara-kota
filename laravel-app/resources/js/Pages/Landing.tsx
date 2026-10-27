@@ -1,44 +1,86 @@
-import React, { useState } from 'react';
-import { Link, router } from '@inertiajs/react';
+import React, { useState, useEffect } from 'react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
   IconBuildingCommunity,
   IconMapPin,
   IconShield,
   IconArrowRight,
   IconUser,
-  IconCrown,
   IconTrophy,
   IconMenu2,
   IconX,
   IconSearch,
   IconLoader2,
+  IconPlus,
+  IconLogout,
+  IconLayoutDashboard,
+  IconShieldLock,
+  IconDatabase,
 } from '@tabler/icons-react';
 import { useAuthStore } from '@/stores/authStore';
-import { useReportsStore } from '@/stores/reportsStore';
-import { reportsApi } from '@/lib/api';
+import { statsApi, reportsApi } from '@/lib/api';
+import { OverviewStats, User } from '@/types';
 import toast from 'react-hot-toast';
 import { useTranslation } from '@/i18n/useTranslation';
 import LanguageToggle from '@/Components/ui/LanguageToggle';
 
+// ─── KPI Skeleton ──────────────────────────────────────────────────────────────
+const KpiSkeleton: React.FC = () => (
+  <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs animate-pulse">
+    <div className="h-3 w-24 bg-slate-200 rounded mb-2" />
+    <div className="h-7 w-16 bg-slate-200 rounded mb-1" />
+    <div className="h-2.5 w-20 bg-slate-100 rounded" />
+  </div>
+);
+
 const LandingPage: React.FC = () => {
   const navigate = (url: string) => router.visit(url);
-  const { user, loginAsRole } = useAuthStore();
-  const { reports } = useReportsStore();
+  const { props } = usePage<{ auth: { user: User | null } }>();
+  const { user, logout } = useAuthStore();
+  const currentUser = props.auth?.user || user;
+
   const { t } = useTranslation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
-  const totalReports = reports.length;
-  const completedReports = reports.filter(r => r.status === 'SELESAI').length;
-  const criticalReports = reports.filter(r => r.skorUrgensi >= 80).length;
+  // ─── Live stats from API ───────────────────────────────────────────────────
+  const [stats, setStats] = useState<OverviewStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
-  const handleQuickEnter = (role: 'WARGA' | 'PETUGAS' | 'SUPERADMIN') => {
-    loginAsRole(role);
-    toast.success(`${t('auth.demoLogin', { role })}`);
-    if (role === 'WARGA') navigate('/dashboard');
-    else if (role === 'PETUGAS') navigate('/petugas');
-    else if (role === 'SUPERADMIN') navigate('/superadmin');
+  const fetchStats = () => {
+    statsApi.overview()
+      .then((data: any) => {
+        if (data && typeof data.total === 'number') {
+          setStats(data as OverviewStats);
+        }
+      })
+      .catch(() => {
+        // Keep stats null — fallback text shown
+      })
+      .finally(() => setStatsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchStats();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchStats, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const totalReports = stats?.total ?? 0;
+  const completedReports = stats?.selesai ?? 0;
+  const resolutionPct = totalReports > 0 ? Math.round((completedReports / totalReports) * 100) : 0;
+  const criticalReports = stats?.highUrgency ?? 0;
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.post('/logout');
+    } catch {
+      router.visit('/');
+    }
   };
 
   return (
@@ -76,19 +118,77 @@ const LandingPage: React.FC = () => {
           <div className="flex items-center gap-2 text-xs">
             <LanguageToggle className="hidden sm:inline-flex" />
 
-            {user ? (
-              <button
-                onClick={() => {
-                  if (user.role === 'PETUGAS') navigate('/petugas');
-                  else if (user.role === 'SUPERADMIN' || user.role === 'ADMIN') navigate('/superadmin');
-                  else navigate('/dashboard');
-                }}
-                className="btn-navy py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5 shadow-sm"
-              >
-                <span className="hidden sm:inline">{t('landing.openDashboard', { role: user.role })}</span>
-                <span className="sm:hidden">{t('common.dashboard')}</span>
-                <IconArrowRight className="w-3.5 h-3.5 text-orange" />
-              </button>
+            {currentUser ? (
+              <div className="relative">
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center gap-2 py-1.5 px-3 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+                >
+                  <IconUser className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="max-w-[120px] truncate">{currentUser.name}</span>
+                  <span className="text-[10px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.5 rounded uppercase">
+                    {currentUser.role}
+                  </span>
+                </button>
+
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50 text-xs">
+                    <div className="px-3 py-2 border-b border-slate-100">
+                      <p className="font-semibold text-slate-800 truncate">{currentUser.name}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{currentUser.email}</p>
+                    </div>
+
+                    {currentUser.role === 'WARGA' && (
+                      <Link
+                        href="/dashboard"
+                        className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 font-medium"
+                      >
+                        <IconLayoutDashboard className="w-4 h-4 text-slate-400" />
+                        <span>{t('landing.btnWarga') || 'Beranda Warga'}</span>
+                      </Link>
+                    )}
+
+                    {currentUser.role === 'PETUGAS' && (
+                      <Link
+                        href="/petugas"
+                        className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 font-medium"
+                      >
+                        <IconShield className="w-4 h-4 text-slate-400" />
+                        <span>{t('landing.btnPetugas') || 'Panel Petugas'}</span>
+                      </Link>
+                    )}
+
+                    {(currentUser.role === 'ADMIN' || currentUser.role === 'SUPERADMIN') && (
+                      <>
+                        <Link
+                          href="/superadmin"
+                          className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 font-medium"
+                        >
+                          <IconShieldLock className="w-4 h-4 text-slate-400" />
+                          <span>{t('landing.btnSuperadmin') || 'Panel Admin'}</span>
+                        </Link>
+                        <Link
+                          href="/superadmin/master"
+                          className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 font-medium"
+                        >
+                          <IconDatabase className="w-4 h-4 text-slate-400" />
+                          <span>Data Master</span>
+                        </Link>
+                      </>
+                    )}
+
+                    <div className="border-t border-slate-100 mt-1 pt-1">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 font-medium cursor-pointer"
+                      >
+                        <IconLogout className="w-4 h-4" />
+                        <span>{t('common.logout') || 'Keluar'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="hidden sm:flex items-center gap-2">
                 <Link href="/login" className="btn-outline py-1.5 px-3 text-xs">
@@ -124,9 +224,44 @@ const LandingPage: React.FC = () => {
               <IconTrophy className="w-4 h-4 text-orange" />
               <span>{t('landing.mobileLeaderboard')}</span>
             </Link>
+
+            {currentUser && (
+              <div className="border-t border-slate-100 pt-2 space-y-1">
+                <div className="px-2 py-1 text-slate-500 font-mono text-[10px] uppercase">
+                  {currentUser.name} ({currentUser.role})
+                </div>
+                {currentUser.role === 'WARGA' && (
+                  <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)} className="block py-1.5 px-2 text-navy font-semibold">
+                    {t('landing.btnWarga') || 'Beranda Warga'}
+                  </Link>
+                )}
+                {currentUser.role === 'PETUGAS' && (
+                  <Link href="/petugas" onClick={() => setIsMobileMenuOpen(false)} className="block py-1.5 px-2 text-navy font-semibold">
+                    {t('landing.btnPetugas') || 'Panel Petugas'}
+                  </Link>
+                )}
+                {(currentUser.role === 'ADMIN' || currentUser.role === 'SUPERADMIN') && (
+                  <>
+                    <Link href="/superadmin" onClick={() => setIsMobileMenuOpen(false)} className="block py-1.5 px-2 text-navy font-semibold">
+                      {t('landing.btnSuperadmin') || 'Panel Admin'}
+                    </Link>
+                    <Link href="/superadmin/master" onClick={() => setIsMobileMenuOpen(false)} className="block py-1.5 px-2 text-slate-700">
+                      Data Master
+                    </Link>
+                  </>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left py-1.5 px-2 text-red-600 font-semibold cursor-pointer"
+                >
+                  {t('common.logout') || 'Keluar'}
+                </button>
+              </div>
+            )}
+
             <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
               <LanguageToggle />
-              {!user && (
+              {!currentUser && (
                 <>
                   <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="btn-outline flex-1 py-2 text-center text-xs">
                     {t('common.login')}
@@ -158,60 +293,72 @@ const LandingPage: React.FC = () => {
             {t('landing.heroDesc')}
           </p>
 
-          {/* Quick Role Portal Buttons */}
+          {/* Dua Aksi Publik Utama */}
           <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={() => handleQuickEnter('WARGA')}
-              className="bg-navy hover:bg-navy-600 text-white font-semibold px-5 py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md flex items-center gap-2 group cursor-pointer"
+            <Link
+              href="/peta"
+              className="bg-navy hover:bg-navy-600 text-white font-semibold px-6 py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md flex items-center gap-2 group cursor-pointer"
             >
-              <IconUser className="w-4 h-4 text-orange" />
-              <span>{t('landing.btnWarga')}</span>
+              <IconMapPin className="w-4 h-4 text-orange" />
+              <span>{t('landing.btnViewMap') || 'Lihat Peta Laporan'}</span>
               <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
+            </Link>
 
             <button
-              onClick={() => handleQuickEnter('PETUGAS')}
-              className="bg-orange hover:bg-orange-600 text-navy-900 font-bold px-5 py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md flex items-center gap-2 group cursor-pointer"
+              onClick={() => {
+                if (currentUser) {
+                  navigate('/peta?lapor=true');
+                } else {
+                  navigate('/lapor');
+                }
+              }}
+              className="bg-orange hover:bg-orange-600 text-navy-900 font-bold px-6 py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md flex items-center gap-2 group cursor-pointer"
             >
-              <IconShield className="w-4 h-4" />
-              <span>{t('landing.btnPetugas')}</span>
-              <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            <button
-              onClick={() => handleQuickEnter('SUPERADMIN')}
-              className="bg-slate-100 hover:bg-slate-200 text-navy font-semibold px-4 py-3 rounded-xl text-xs sm:text-sm border border-slate-300 transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <IconCrown className="w-4 h-4 text-purple-700" />
-              <span>{t('landing.btnSuperadmin')}</span>
+              <IconPlus className="w-4 h-4" />
+              <span>{t('landing.btnCreateReport') || 'Buat Laporan'}</span>
             </button>
           </div>
 
           {/* KPI Counters */}
           <div className="pt-8 max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3 text-left">
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <span className="text-[11px] font-semibold text-slate-500 block">{t('landing.kpiTotal')}</span>
-              <span className="text-xl sm:text-2xl font-bold text-navy">{totalReports}+</span>
-              <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiTotalSub')}</span>
-            </div>
+            {statsLoading ? (
+              <>
+                <KpiSkeleton />
+                <KpiSkeleton />
+                <KpiSkeleton />
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-orange block">{t('landing.kpiCoverage')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-navy">{t('landing.kpiCoverageSub1')}</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block">{t('landing.kpiTotal')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-navy">{totalReports}+</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiTotalSub')}</span>
+                </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <span className="text-[11px] font-semibold text-emerald-600 block">{t('landing.kpiDone')}</span>
-              <span className="text-xl sm:text-2xl font-bold text-emerald-700">{completedReports} {t('landing.kpiDoneUnit')}</span>
-              <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiDoneSub')}</span>
-            </div>
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-emerald-600 block">{t('landing.kpiDone')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-emerald-700">{resolutionPct}%</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{completedReports} {t('landing.kpiDoneUnit')}</span>
+                </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <span className="text-[11px] font-semibold text-red-600 block">{t('landing.kpiCritical')}</span>
-              <span className="text-xl sm:text-2xl font-bold text-red-700">{criticalReports} {t('landing.kpiCasesUnit')}</span>
-              <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCriticalSub')}</span>
-            </div>
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-red-600 block">{t('landing.kpiCritical')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-red-700">{criticalReports} {t('landing.kpiCasesUnit')}</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCriticalSub')}</span>
+                </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-              <span className="text-[11px] font-semibold text-orange block">{t('landing.kpiCoverage')}</span>
-              <span className="text-xl sm:text-2xl font-bold text-navy">{t('landing.kpiCoverageSub1')}</span>
-              <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
-            </div>
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                  <span className="text-[11px] font-semibold text-orange block">{t('landing.kpiCoverage')}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-navy">{t('landing.kpiCoverageSub1')}</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -309,12 +456,13 @@ const LandingPage: React.FC = () => {
               <h2 className="text-2xl font-bold text-navy mt-1">{t('landing.mapSectionTitle')}</h2>
               <p className="text-xs text-slate-500">{t('landing.mapSectionDesc')}</p>
             </div>
-            <button
-              onClick={() => handleQuickEnter('WARGA')}
-              className="btn-orange text-xs font-semibold py-2 px-4 shadow-sm"
+            <Link
+              href="/peta"
+              className="btn-orange text-xs font-semibold py-2 px-4 shadow-sm inline-flex items-center gap-1.5"
             >
-              {t('landing.mapBtn')}
-            </button>
+              <IconMapPin className="w-4 h-4" />
+              <span>{t('landing.mapBtn')}</span>
+            </Link>
           </div>
 
           <div className="h-[460px] rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm relative">

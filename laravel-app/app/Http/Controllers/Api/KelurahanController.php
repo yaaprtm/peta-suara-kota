@@ -61,4 +61,17 @@ class KelurahanController extends Controller
             ],
         ]);
     }
+
+    /**
+     * GET /api/kelurahans/geo/bounds
+     * 
+     * Get Surabaya city bounding box and center coordinates
+     */
+    public function geoBounds(): JsonResponse
+    {
+        return response()->json([
+            'bounds' => \App\Services\GeofenceValidator::getBoundingBox(),
+            'center' => \App\Services\GeofenceValidator::getSurabayaCenter(),
+        ]);
+    }
 }

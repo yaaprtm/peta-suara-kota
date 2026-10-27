@@ -9,7 +9,10 @@ use App\Http\Resources\ReportResource;
 use App\Models\Category;
 use App\Models\Report;
 use App\Models\StatusLog;
+use App\Services\GeofenceValidator;
 use App\Services\KecamatanService;
+use App\Services\StatusWorkflowManager;
+use App\Services\StorageService;
 use App\Services\UrgencyScorer;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -165,26 +168,33 @@ class ReportController extends Controller
         $lat = (float) $request->latitude;
         $lng = (float) $request->longitude;
 
-        // Validasi batasan Surabaya
-        $detectedKecamatan = KecamatanService::determineKecamatan($lng, $lat);
-        if (!$detectedKecamatan) {
+        // Validate coordinates using GeofenceValidator
+        $validation = GeofenceValidator::validate($lat, $lng);
+        if (!$validation['valid']) {
             return response()->json([
-                'message' => 'Koordinat lokasi laporan berada di luar cakupan wilayah Surabaya. Silakan pilih titik lokasi di dalam area Surabaya.',
+                'message' => $validation['message'],
             ], 400);
         }
+
+        $detectedKecamatan = $validation['kecamatan'];
 
         // Upload media files
         $photoPaths = [];
         if ($request->hasFile('photos')) {
-            foreach ($request->file('photos') as $file) {
-                $path = $file->store('photos', 'public');
-                $photoPaths[] = $path;
-            }
+            $photoPaths = StorageService::storeFiles(
+                $request->file('photos'),
+                'photos',
+                'public'
+            );
         }
 
         $audioPath = null;
         if ($request->hasFile('audio')) {
-            $audioPath = $request->file('audio')->store('audio', 'public');
+            $audioPath = StorageService::storeFile(
+                $request->file('audio'),
+                'audio',
+                'public'
+            );
         }
 
         // Urgency scoring
@@ -233,6 +243,40 @@ class ReportController extends Controller
     /**
      * PATCH /api/reports/{id}/status
      */
+    /**
+     * GET /api/reports/{id}/status/transitions
+     * 
+     * Get valid next status transitions for a report
+     */
+    public function getValidTransitions(string $id): JsonResponse
+    {
+        $report = Report::find($id);
+        if (!$report) {
+            return response()->json(['message' => 'Laporan tidak ditemukan'], 404);
+        }
+
+        $validNextStatuses = StatusWorkflowManager::getValidNextStatuses($report->status);
+
+        $transitions = array_map(function ($status) {
+            return [
+                'status' => $status,
+                'label' => StatusWorkflowManager::getStatusLabel($status),
+                'color' => StatusWorkflowManager::getStatusColor($status),
+                'requiresNote' => StatusWorkflowManager::requiresCompletionNote($status),
+            ];
+        }, $validNextStatuses);
+
+        return response()->json([
+            'currentStatus' => $report->status,
+            'validTransitions' => array_values($transitions),
+        ]);
+    }
+
+    /**
+     * PATCH /api/reports/{id}/status
+     * 
+     * Update report status (PETUGAS, ADMIN, SUPERADMIN only)
+     */
     public function updateStatus(UpdateReportStatusRequest $request, string $id): JsonResponse
     {
         $report = Report::find($id);
@@ -243,8 +287,27 @@ class ReportController extends Controller
         $oldStatus = $report->status;
         $newStatus = $request->status;
 
+        // Validate status transition
+        $transitionValidation = StatusWorkflowManager::validateTransition($oldStatus, $newStatus);
+        if (!$transitionValidation['valid']) {
+            return response()->json([
+                'message' => $transitionValidation['message'],
+            ], 400);
+        }
+
+        // Check if completion note is required
+        if (StatusWorkflowManager::requiresCompletionNote($newStatus)) {
+            $note = $request->completion_note ?? $request->note;
+            if (empty($note)) {
+                return response()->json([
+                    'message' => "Catatan penyelesaian wajib diisi untuk status '{$newStatus}'.",
+                ], 400);
+            }
+        }
+
         $updateData = ['status' => $newStatus];
 
+        // Handle SELESAI status
         if ($newStatus === 'SELESAI') {
             $updateData['resolved_at'] = now();
             if ($request->filled('completion_note')) {
@@ -255,9 +318,12 @@ class ReportController extends Controller
 
             $compPhotos = $report->completion_photos ?? [];
             if ($request->hasFile('completion_photos')) {
-                foreach ($request->file('completion_photos') as $file) {
-                    $compPhotos[] = $file->store('photos', 'public');
-                }
+                $newPhotos = StorageService::storeFiles(
+                    $request->file('completion_photos'),
+                    'photos',
+                    'public'
+                );
+                $compPhotos = array_merge($compPhotos, $newPhotos);
             } elseif ($request->filled('completion_photos')) {
                 $raw = $request->input('completion_photos');
                 if (is_array($raw)) {
@@ -272,8 +338,23 @@ class ReportController extends Controller
             }
         }
 
+        // Handle DITOLAK status
+        if ($newStatus === 'DITOLAK') {
+            if ($request->filled('completion_note')) {
+                $updateData['completion_note'] = $request->completion_note;
+            } elseif ($request->filled('note')) {
+                $updateData['completion_note'] = $request->note;
+            }
+        }
+
+        // Clear resolved_at if reverting from SELESAI
+        if ($oldStatus === 'SELESAI' && $newStatus !== 'SELESAI') {
+            $updateData['resolved_at'] = null;
+        }
+
         $report->update($updateData);
 
+        // Create status log entry
         StatusLog::create([
             'report_id' => $report->id,
             'from_status' => $oldStatus,
@@ -283,7 +364,7 @@ class ReportController extends Controller
             'changed_at' => now(),
         ]);
 
-        $report->load(['user', 'kelurahan', 'statusLogs.changedBy']);
+        $report->load(['user', 'kelurahan', 'statusLogs.changedBy', 'categoryRef']);
 
         return response()->json([
             'message' => 'Status berhasil diperbarui',

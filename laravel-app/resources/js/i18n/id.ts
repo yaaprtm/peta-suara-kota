@@ -120,13 +120,15 @@ const id = {
     mobileFlow: 'Alur Pelaporan',
     mobileMap: 'Peta Publik Kota',
     mobileLeaderboard: 'Leaderboard Kelurahan',
-    heroBadge: 'Platform Aspirasi & Command Center Pelaporan Kota Surabaya',
+    heroBadge: 'Platform Aspirasi dan Pengaduan Warga Kota Surabaya',
     heroTitle1: 'Suarakan Keluhan Kotamu,',
     heroTitle2: 'Ditangani Cepat & Transparan.',
     heroDesc: 'Laporkan jalan berlubang, genangan banjir, tumpukan sampah, dan lampu penerangan mati hanya dengan suara atau foto. Terhubung langsung dengan aparatur dan dinas terkait.',
-    btnWarga: 'Masuk Beranda Warga (/dashboard)',
-    btnPetugas: 'Command Center Petugas (/petugas)',
-    btnSuperadmin: 'Panel Superadmin (/superadmin)',
+    btnViewMap: 'Lihat Peta Laporan',
+    btnCreateReport: 'Buat Laporan',
+    btnWarga: 'Beranda Warga',
+    btnPetugas: 'Panel Petugas',
+    btnSuperadmin: 'Panel Admin',
     kpiTotal: 'TOTAL LAPORAN KOTA',
     kpiTotalSub: 'Di seluruh Surabaya',
     kpiDone: 'TELAH BERES',
@@ -310,8 +312,8 @@ const id = {
 
   // ── Petugas Dashboard ─────────────────────────────────────────────────────────
   petugas: {
-    headerTitle: 'COMMAND CENTER PETUGAS SURABAYA',
-    liveTag: 'LIVE RADAR',
+    headerTitle: 'PANEL PETUGAS SURABAYA',
+    liveTag: 'PANEL PETUGAS',
     headerSubtitle: 'Aparatur: {{name}} · Antrean Urgensi Terpadu',
     rekapBtn: 'Rekap Laporan Harian',
     refreshTitle: 'Segarkan Data',
@@ -372,8 +374,8 @@ const id = {
 
   // ── Superadmin Dashboard ──────────────────────────────────────────────────────
   superadmin: {
-    headerTitle: 'PANEL SUPERADMIN KOTA SURABAYA',
-    controlTag: 'PUSAT KONTROL',
+    headerTitle: 'PANEL ADMIN KOTA SURABAYA',
+    controlTag: 'PANEL ADMIN',
     headerSubtitle: 'Pengguna: {{name}} · Hak Akses Penuh Kota',
     masterDataBtn: 'Kelola Master Data',
     statsTitle: 'Statistik Seluruh Kota Surabaya',

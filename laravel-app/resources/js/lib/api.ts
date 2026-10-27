@@ -207,6 +207,28 @@ export const statsApi = {
   leaderboard: () => request<{ leaderboard: unknown[] }>('/stats/leaderboard'),
 };
 
+// ─── Users API (Admin only) ────────────────────────────────────────────────────
+
+export const usersApi = {
+  list: (params?: { search?: string; role?: string }) => {
+    const qs = params && Object.keys(params).length
+      ? '?' + new URLSearchParams(params as Record<string, string>).toString()
+      : '';
+    return request<{ users: unknown[]; total: number }>(`/users${qs}`);
+  },
+
+  updateRole: (id: string, role: string) =>
+    request<{ user: unknown; message: string }>(`/users/${id}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+
+  toggleActive: (id: string) =>
+    request<{ isActive: boolean; userId: string; message: string }>(`/users/${id}/toggle-active`, {
+      method: 'PATCH',
+    }),
+};
+
 // ─── SSE Helper ────────────────────────────────────────────────────────────────
 
 export function createSSEConnection(
