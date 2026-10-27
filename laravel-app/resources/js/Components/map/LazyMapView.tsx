@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { LoadingSpinner } from '@/Components/ui/Badges';
+import type { Report } from '@/types';
 
 // Lazy load MapView untuk mengurangi initial bundle
 const MapView = lazy(() => import('./MapView'));
@@ -14,8 +15,9 @@ const MapViewSkeleton: React.FC = () => (
 );
 
 interface LazyMapViewProps {
-  children?: React.ReactNode;
-  [key: string]: any;
+  onSelectReport: (report: Report) => void;
+  onMapClick: (latlng: { lat: number; lng: number }) => void;
+  isPickingLocation: boolean;
 }
 
 export const LazyMapView: React.FC<LazyMapViewProps> = (props) => {
