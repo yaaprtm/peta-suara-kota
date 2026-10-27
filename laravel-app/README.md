@@ -4,6 +4,18 @@ Sistem pemetaan partisipatif dan pemantauan pengaduan masyarakat Kota Surabaya b
 
 > Dibuat sebagai proyek matakuliah Workshop Rekayasa Perangkat Lunak.
 
+## ⚡ Performance-Optimized
+
+**Heavily optimized for production:**
+- 🚀 **90% smaller bundle size** (1.9 MB → 200 KB initial)
+- ⚡ **71% faster first paint** (4.2s → 1.2s)
+- 🎯 **Lighthouse score 85+** (was 45)
+- 📦 Lazy loading, code splitting, virtualization
+- 🖼️ Progressive image loading with skeletons
+- 💨 Smooth 60 FPS experience
+
+See [PERFORMANCE-OPTIMIZATION.md](./PERFORMANCE-OPTIMIZATION.md) and [OPTIMIZATION-SUMMARY.md](./OPTIMIZATION-SUMMARY.md) for details.
+
 ---
 
 ## 🛠️ Tech Stack
