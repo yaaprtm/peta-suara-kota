@@ -368,7 +368,7 @@ const MapPage: React.FC = () => {
   );
 };
 
-// ─── ReportCard ───────────────────────────────────────────────────────────────
+// ─── ReportCard (Memoized untuk performa) ─────────────────────────────────────
 
 interface ReportCardProps {
   report: Report;
@@ -376,7 +376,7 @@ interface ReportCardProps {
   onHover: (id: string | null) => void;
 }
 
-const ReportCard: React.FC<ReportCardProps> = ({ report, onSelect, onHover }) => {
+const ReportCard: React.FC<ReportCardProps> = React.memo(({ report, onSelect, onHover }) => {
   const isCritical = report.skorUrgensi >= 80;
   const isHigh = report.skorUrgensi >= 60;
 
@@ -422,6 +422,15 @@ const ReportCard: React.FC<ReportCardProps> = ({ report, onSelect, onHover }) =>
       </div>
     </button>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison untuk mencegah re-render yang tidak perlu
+  return (
+    prevProps.report.id === nextProps.report.id &&
+    prevProps.report.skorUrgensi === nextProps.report.skorUrgensi &&
+    prevProps.report.createdAt === nextProps.report.createdAt
+  );
+});
+
+ReportCard.displayName = 'ReportCard';
 
 export default MapPage;
