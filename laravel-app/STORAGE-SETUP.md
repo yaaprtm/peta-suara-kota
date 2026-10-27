@@ -1,6 +1,6 @@
-# S3-Compatible Storage Setup Guide
+# Storage Setup Guide (TIBD Cloud Compatible)
 
-## Why S3 Storage is Required for Production
+## Why Cloud Storage is Required for Production
 
 **Vercel Serverless Limitations:**
 - Serverless functions have **read-only filesystem** after build
@@ -10,9 +10,52 @@
 
 **Solution:** Use S3-compatible object storage for persistent file uploads.
 
-## Recommended Storage Providers
+## Recommended Storage Options
 
-### 1. Cloudflare R2 (Recommended)
+### 1. TIBD Cloud Storage (Current Setup)
+
+**Pros:**
+- ✅ Already configured in your account
+- ✅ Local Indonesian infrastructure
+- ✅ Fast access from Indonesia
+- ✅ Integrated with TIBD Cloud hosting
+
+**Setup Steps:**
+
+1. **Access TIBD Cloud Dashboard**
+   - Login to your TIBD Cloud account
+   - Navigate to Storage/Object Storage section
+
+2. **Create Storage Bucket**
+   - Bucket name: `peta-suara-kota-surabaya`
+   - Region: Select closest to deployment
+
+3. **Get Storage Credentials**
+   - Generate access credentials from dashboard
+   - Note: Endpoint URL, Access Key, Secret Key
+
+4. **Configure Laravel Storage**
+   
+   Update `config/filesystems.php` to add TIBD Cloud disk:
+   ```php
+   'tibd' => [
+       'driver' => 'local', // or 's3' if TIBD supports S3-compatible API
+       'root' => env('TIBD_STORAGE_PATH', storage_path('app/public')),
+       'url' => env('TIBD_STORAGE_URL'),
+       'visibility' => 'public',
+   ],
+   ```
+
+5. **Environment Variables**
+   ```env
+   FILESYSTEM_DISK=tibd
+   TIBD_STORAGE_PATH=/path/to/tibd/storage
+   TIBD_STORAGE_URL=https://storage.tibdcloud.com/your-bucket
+   ```
+
+**Note:** If TIBD Cloud uses S3-compatible API, use configuration similar to option #2 below.
+
+### 2. Cloudflare R2 (Alternative - Recommended if TIBD doesn't have object storage)
 
 **Pros:**
 - ✅ **Free tier**: 10 GB storage, 1 million requests/month
@@ -62,7 +105,7 @@
    - R2 Dashboard → Right sidebar → Copy Account ID
    - Endpoint format: `https://<account-id>.r2.cloudflarestorage.com`
 
-### 2. AWS S3
+### 2. AWS S3 (Alternative)
 
 **Pros:**
 - ✅ Most reliable and feature-rich
@@ -121,7 +164,7 @@
    AWS_USE_PATH_STYLE_ENDPOINT=false
    ```
 
-### 3. DigitalOcean Spaces
+### 3. DigitalOcean Spaces (Alternative)
 
 **Pros:**
 - ✅ Simple pricing: $5/month for 250GB storage + 1TB bandwidth
@@ -159,7 +202,7 @@
    AWS_USE_PATH_STYLE_ENDPOINT=false
    ```
 
-### 4. Backblaze B2
+### 4. Backblaze B2 (Alternative)
 
 **Pros:**
 - ✅ Cheapest storage: $0.005/GB/month (4x cheaper than S3)
@@ -169,18 +212,16 @@
 **Cons:**
 - ⚠️ Slower than Cloudflare R2 or AWS S3
 
-## Installation
+## Installation (For S3-Compatible Storage)
 
-### 1. Install AWS SDK
+### 1. Install AWS SDK (Optional - Only if using S3-compatible storage)
 
-The package is already added to `composer.json`:
+If you're using TIBD Cloud's local storage, you don't need this. If using S3-compatible providers (Cloudflare R2, AWS S3), install:
 
 ```bash
 cd laravel-app
-composer install
+composer require league/flysystem-aws-s3-v3
 ```
-
-This installs `league/flysystem-aws-s3-v3` package.
 
 ### 2. Configure Environment
 
@@ -189,7 +230,15 @@ This installs `league/flysystem-aws-s3-v3` package.
 FILESYSTEM_DISK=public
 ```
 
-**Production (.env on Vercel):**
+**Production (.env on TIBD Cloud/Vercel):**
+
+**Option A - TIBD Cloud Local Storage:**
+```env
+FILESYSTEM_DISK=public
+# Or configure custom TIBD disk in config/filesystems.php
+```
+
+**Option B - S3-Compatible Storage (Cloudflare R2, AWS S3, etc.):**
 ```env
 FILESYSTEM_DISK=s3
 AWS_ACCESS_KEY_ID=your_key
@@ -393,7 +442,7 @@ Compress audio files before upload:
 ## Troubleshooting
 
 ### Issue: "Class 'League\Flysystem\AwsS3V3\AwsS3V3Adapter' not found"
-**Solution:** Run `composer install` to install AWS SDK
+**Solution:** Install AWS SDK: `composer require league/flysystem-aws-s3-v3` (only needed for S3-compatible storage)
 
 ### Issue: "Credentials could not be loaded"
 **Solution:** Verify `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are set
@@ -435,9 +484,15 @@ foreach ($files as $file) {
 
 ## Summary
 
-✅ **For Production:**
+✅ **For TIBD Cloud Production:**
+- Use TIBD Cloud's built-in storage (if available)
+- Or use `public` disk with persistent storage mount
+- Set `FILESYSTEM_DISK=public`
+
+✅ **For S3-Compatible Storage (Alternative):**
 - Use Cloudflare R2 (recommended - free tier, zero egress)
 - Or AWS S3 (most reliable, but more expensive)
+- Install: `composer require league/flysystem-aws-s3-v3`
 - Set `FILESYSTEM_DISK=s3`
 
 ✅ **For Local Development:**
@@ -450,4 +505,4 @@ foreach ($files as $file) {
 - No code changes between environments
 - Just configure environment variables
 
-🎯 **Ready for Production** once S3 credentials are configured in Vercel!
+🎯 **Ready for Production** with TIBD Cloud's local storage or external S3-compatible provider!
