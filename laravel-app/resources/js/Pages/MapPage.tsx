@@ -292,6 +292,7 @@ const MapPage: React.FC = () => {
               onSelectReport={handleSelectReport}
               onMapClick={handleMapClick}
               isPickingLocation={isPickingLocation}
+              pickedLocation={pickedLocation}
             />
 
             {/* Loading overlay */}

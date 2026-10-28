@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link, router } from '@inertiajs/react';
 import {
   IconShield,
@@ -14,6 +14,8 @@ import {
   IconTrendingUp,
   IconX,
   IconExternalLink,
+  IconCurrentLocation,
+  IconCircleDot,
 } from '@tabler/icons-react';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -41,12 +43,66 @@ const PetugasDashboardPage: React.FC = () => {
   const [showRekapModal, setShowRekapModal] = useState(false);
   const [mobileTab, setMobileTab] = useState<'queue' | 'map'>('queue');
 
+  // ── GIS: Nearby Me ──────────────────────────────────────────────────────
+  const [nearbyReports, setNearbyReports] = useState<(Report & { distanceKm: number })[]>([]);
+  const [isNearbyMode, setIsNearbyMode] = useState(false);
+  const [isLoadingNearby, setIsLoadingNearby] = useState(false);
+  const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  const handleFindNearest = useCallback(async () => {
+    if (!navigator.geolocation) {
+      toast.error('Browser tidak mendukung geolokasi.');
+      return;
+    }
+    setIsLoadingNearby(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setMyLocation({ lat, lng });
+        try {
+          const { reportsApi } = await import('@/lib/api');
+          const res = await reportsApi.nearby({ lat, lng, radius: 3, limit: 20 });
+          if (res.reports.length === 0) {
+            toast('Tidak ada laporan aktif dalam radius 3 km dari lokasi Anda.', { icon: '📍' });
+          } else {
+            toast.success(`Ditemukan ${res.reports.length} laporan dalam radius 3 km`);
+          }
+          setNearbyReports(res.reports as (Report & { distanceKm: number })[]);
+          setIsNearbyMode(true);
+        } catch {
+          toast.error('Gagal memuat laporan terdekat.');
+        } finally {
+          setIsLoadingNearby(false);
+        }
+      },
+      (err) => {
+        setIsLoadingNearby(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          toast.error('Akses lokasi ditolak. Izinkan lokasi di browser Anda.');
+        } else {
+          toast.error('Gagal mendapatkan lokasi Anda.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
+
+  const handleClearNearby = useCallback(() => {
+    setIsNearbyMode(false);
+    setNearbyReports([]);
+    setMyLocation(null);
+  }, []);
+
   // Fetch reports from API on mount
   useEffect(() => {
     fetchReports();
   }, [fetchReports]);
 
   const sortedAndFilteredReports = useMemo(() => {
+    // Jika mode nearby aktif, gunakan daftar laporan terdekat
+    if (isNearbyMode) return nearbyReports;
+
     return reports
       .filter((r) => {
         if (searchQuery) {
@@ -62,7 +118,7 @@ const PetugasDashboardPage: React.FC = () => {
         if (b.skorUrgensi !== a.skorUrgensi) return b.skorUrgensi - a.skorUrgensi;
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
-  }, [reports, searchQuery, selectedCategory, selectedStatus, selectedLevel]);
+  }, [reports, searchQuery, selectedCategory, selectedStatus, selectedLevel, isNearbyMode, nearbyReports]);
 
   const activeReport = useMemo(() => {
     if (selectedReportId) return reports.find((r) => r.id === selectedReportId) || sortedAndFilteredReports[0] || null;
@@ -242,6 +298,27 @@ const PetugasDashboardPage: React.FC = () => {
                 {t('petugas.resetFilter')}
               </button>
             )}
+
+            {/* ── GIS: Tombol Terdekat dari Saya ── */}
+            {!isNearbyMode ? (
+              <button
+                onClick={handleFindNearest}
+                disabled={isLoadingNearby}
+                className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-navy bg-navy text-white text-xs font-semibold hover:bg-navy-700 disabled:opacity-60 transition-colors"
+                title="Tampilkan laporan aktif terdekat dari posisi Anda (radius 3 km)"
+              >
+                <IconCurrentLocation className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+                {isLoadingNearby ? 'Mencari…' : 'Terdekat dari Saya'}
+              </button>
+            ) : (
+              <button
+                onClick={handleClearNearby}
+                className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-orange bg-orange text-white text-xs font-semibold hover:bg-orange-600 transition-colors"
+              >
+                <IconX className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+                Keluar Mode Terdekat
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -282,16 +359,35 @@ const PetugasDashboardPage: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-2 space-y-1.5">
+              {/* ── GIS: Nearby Mode Banner ── */}
+              {isNearbyMode && myLocation && (
+                <div className="flex items-start gap-2 bg-navy/5 border border-navy/20 rounded-lg p-2.5 mb-1 text-[10px]">
+                  <IconCircleDot className="w-4 h-4 text-navy shrink-0 mt-0.5" stroke={1.8} />
+                  <div>
+                    <p className="font-bold text-navy">Mode Terdekat Aktif</p>
+                    <p className="text-slate-500 mt-0.5">
+                      {nearbyReports.length} laporan aktif dalam radius 3 km dari posisi Anda.
+                      Diurutkan berdasarkan jarak terdekat.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {sortedAndFilteredReports.length === 0 ? (
                 <div className="text-center py-16 px-4">
                   <IconCheck className="w-10 h-10 text-emerald-500 mx-auto mb-2 opacity-80" />
-                  <p className="font-bold text-slate-700 text-xs">{t('petugas.queueEmpty')}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{t('petugas.queueEmptyDesc')}</p>
+                  <p className="font-bold text-slate-700 text-xs">
+                    {isNearbyMode ? 'Tidak ada laporan aktif dalam radius 3 km' : t('petugas.queueEmpty')}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {isNearbyMode ? 'Coba perluas radius atau periksa koneksi lokasi Anda.' : t('petugas.queueEmptyDesc')}
+                  </p>
                 </div>
               ) : (
                 sortedAndFilteredReports.map((report) => {
                   const isSelected = activeReport?.id === report.id;
                   const isCritical = report.skorUrgensi >= 80;
+                  const distKm = (report as any).distanceKm as number | undefined;
                   return (
                     <div
                       key={report.id}
@@ -306,6 +402,15 @@ const PetugasDashboardPage: React.FC = () => {
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <UrgencyBadge score={report.skorUrgensi} />
                           <CategoryBadge category={report.category} />
+                          {/* Distance badge di mode nearby */}
+                          {isNearbyMode && distKm !== undefined && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-navy/10 text-navy text-[9px] font-bold">
+                              <IconCurrentLocation className="w-2.5 h-2.5" stroke={2} />
+                              {distKm < 1
+                                ? `${Math.round(distKm * 1000)} m`
+                                : `${distKm.toFixed(1)} km`}
+                            </span>
+                          )}
                         </div>
                         <StatusBadge status={report.status} />
                       </div>

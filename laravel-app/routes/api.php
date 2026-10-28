@@ -19,6 +19,7 @@ Route::middleware(['web'])->group(function () {
     // Reports endpoints
     Route::prefix('reports')->group(function () {
         Route::get('viewport', [ReportController::class, 'viewport']);
+        Route::get('nearby', [ReportController::class, 'nearby']); // GIS: laporan terdekat (Haversine)
         Route::get('stream', [ReportController::class, 'stream']);
         
         // Export requires ADMIN or SUPERADMIN
@@ -57,6 +58,7 @@ Route::middleware(['web'])->group(function () {
     Route::prefix('stats')->group(function () {
         Route::get('overview', [StatsController::class, 'overview']);
         Route::get('leaderboard', [StatsController::class, 'leaderboard']);
+        Route::get('kecamatan-density', [StatsController::class, 'kecamatanDensity']); // GIS: choropleth
     });
 
     // User management endpoints (ADMIN/SUPERADMIN only)

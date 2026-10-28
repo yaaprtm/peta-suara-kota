@@ -23,6 +23,73 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ReportController extends Controller
 {
     /**
+     * GET /api/reports/nearby?lat=&lng=&radius=&limit=
+     * Cari laporan terdekat dari koordinat tertentu menggunakan Haversine formula.
+     * Digunakan oleh fitur "Terdekat dari Saya" untuk petugas.
+     */
+    public function nearby(Request $request): JsonResponse
+    {
+        $lat    = (float) $request->query('lat', 0);
+        $lng    = (float) $request->query('lng', 0);
+        $radius = min((float) ($request->query('radius', 2)), 10); // max 10 km
+        $limit  = min((int) ($request->query('limit', 20)), 50);
+
+        if ($lat === 0.0 && $lng === 0.0) {
+            return response()->json(['message' => 'Parameter lat dan lng wajib diisi.'], 400);
+        }
+
+        // Pre-filter bounding box ≈ radius/111 derajat (1 derajat ≈ 111 km)
+        $delta = $radius / 111.0;
+
+        $reports = Report::with([
+            'user'     => fn($q) => $q->select(['id', 'name', 'avatar']),
+            'kelurahan'=> fn($q) => $q->select(['id', 'name', 'kecamatan']),
+        ])
+        ->whereBetween('latitude',  [$lat - $delta, $lat + $delta])
+        ->whereBetween('longitude', [$lng - $delta, $lng + $delta])
+        ->whereNotIn('status', ['SELESAI', 'DITOLAK']) // hanya laporan aktif
+        ->get();
+
+        // Hitung jarak Haversine di PHP, filter tepat, urutkan terdekat
+        $withDistance = $reports->map(function ($r) use ($lat, $lng) {
+            $r->distance_km = self::haversineKm($lat, $lng, (float)$r->latitude, (float)$r->longitude);
+            return $r;
+        })
+        ->filter(fn($r) => $r->distance_km <= $radius + 0.01)
+        ->sortBy('distance_km')
+        ->take($limit)
+        ->values();
+
+        $data = $withDistance->map(function ($r) {
+            $resource = (new ReportResource($r))->resolve();
+            $resource['distanceKm'] = round($r->distance_km, 3);
+            return $resource;
+        });
+
+        return response()->json([
+            'reports'    => $data,
+            'count'      => $data->count(),
+            'centerLat'  => $lat,
+            'centerLng'  => $lng,
+            'radiusKm'   => $radius,
+        ]);
+    }
+
+    /**
+     * Haversine formula — jarak antara dua koordinat dalam kilometer.
+     */
+    private static function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $R  = 6371.0; // Radius bumi dalam km
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a  = sin($dLat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+        $c  = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $R * $c;
+    }
+
+    /**
      * GET /api/reports/viewport
      */
     public function viewport(Request $request): JsonResponse

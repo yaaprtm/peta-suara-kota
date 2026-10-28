@@ -18,6 +18,7 @@ interface LazyMapViewProps {
   onSelectReport: (report: Report) => void;
   onMapClick: (latlng: { lat: number; lng: number }) => void;
   isPickingLocation: boolean;
+  pickedLocation?: { lat: number; lng: number } | null;
 }
 
 export const LazyMapView: React.FC<LazyMapViewProps> = (props) => {

@@ -71,6 +71,67 @@ class StatsController extends Controller
     }
 
     /**
+     * GET /api/stats/kecamatan-density
+     * Aggregate report count + avg urgency per kecamatan (untuk choropleth map)
+     */
+    public function kecamatanDensity(): JsonResponse
+    {
+        // Gabungkan dari kolom kecamatan langsung dan lewat relasi kelurahan
+        $direct = Report::selectRaw('kecamatan AS name, COUNT(*) AS total, AVG(skor_urgensi) AS avg_urgensi')
+            ->whereNotNull('kecamatan')
+            ->where('kecamatan', '!=', '')
+            ->groupBy('kecamatan')
+            ->get();
+
+        // Index berdasar nama kecamatan (lower-case) untuk merge
+        $map = [];
+        foreach ($direct as $row) {
+            $key = strtolower(trim($row->name));
+            if (!$key) continue;
+            $map[$key] = [
+                'kecamatan' => $row->name,
+                'total' => (int) $row->total,
+                'avgUrgensi' => (float) round($row->avg_urgensi, 1),
+            ];
+        }
+
+        // Laporan yang tidak punya kolom kecamatan, tapi punya kelurahan.kecamatan
+        $viaKelurahan = Report::with(['kelurahan' => fn($q) => $q->select(['id', 'kecamatan'])])
+            ->whereNull('kecamatan')
+            ->orWhere('kecamatan', '')
+            ->get(['id', 'kelurahan_id', 'skor_urgensi']);
+
+        foreach ($viaKelurahan as $r) {
+            $kec = $r->kelurahan?->kecamatan;
+            if (!$kec) continue;
+            $key = strtolower(trim($kec));
+            if (isset($map[$key])) {
+                $oldTotal = $map[$key]['total'];
+                $newTotal = $oldTotal + 1;
+                $map[$key]['total'] = $newTotal;
+                $map[$key]['avgUrgensi'] = round(
+                    (($map[$key]['avgUrgensi'] * $oldTotal) + $r->skor_urgensi) / $newTotal,
+                    1
+                );
+            } else {
+                $map[$key] = [
+                    'kecamatan' => $kec,
+                    'total' => 1,
+                    'avgUrgensi' => (float) $r->skor_urgensi,
+                ];
+            }
+        }
+
+        $result = array_values($map);
+        usort($result, fn($a, $b) => $b['total'] - $a['total']);
+
+        return response()->json([
+            'density' => $result,
+            'maxTotal' => count($result) > 0 ? max(array_column($result, 'total')) : 0,
+        ]);
+    }
+
+    /**
      * GET /api/stats/overview
      */
     public function overview(): JsonResponse

@@ -155,6 +155,21 @@ export const reportsApi = {
     return request<{ reports: Report[]; count: number }>(`/reports/viewport${qs}`);
   },
 
+  nearby: (params: { lat: number; lng: number; radius?: number; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('lat', params.lat.toString());
+    searchParams.set('lng', params.lng.toString());
+    if (params.radius) searchParams.set('radius', params.radius.toString());
+    if (params.limit) searchParams.set('limit', params.limit.toString());
+    return request<{
+      reports: (Report & { distanceKm: number })[];
+      count: number;
+      centerLat: number;
+      centerLng: number;
+      radiusKm: number;
+    }>(`/reports/nearby?${searchParams.toString()}`);
+  },
+
   get: (id: string) => request<{ report: Report }>(`/reports/${id}`),
 
   create: (formData: FormData) =>
@@ -205,6 +220,11 @@ export const kelurahansApi = {
 export const statsApi = {
   overview: () => request<unknown>('/stats/overview'),
   leaderboard: () => request<{ leaderboard: unknown[] }>('/stats/leaderboard'),
+  kecamatanDensity: () =>
+    request<{
+      density: { kecamatan: string; total: number; avgUrgensi: number }[];
+      maxTotal: number;
+    }>('/stats/kecamatan-density'),
 };
 
 // ─── Users API (Admin only) ────────────────────────────────────────────────────
