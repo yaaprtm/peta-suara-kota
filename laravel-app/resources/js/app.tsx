@@ -15,6 +15,8 @@ createInertiaApp({
             import.meta.glob('./Pages/**/*.tsx'),
         ),
     setup({ el, App, props }) {
+        // Pastikan root element mengisi full viewport agar MapPage bisa pakai h-screen
+        el.style.height = '100%';
         const root = createRoot(el);
 
         root.render(<App {...props} />);

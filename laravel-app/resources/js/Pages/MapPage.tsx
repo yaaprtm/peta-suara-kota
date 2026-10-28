@@ -128,7 +128,10 @@ const MapPage: React.FC = () => {
   }, [filteredReports]);
 
   return (
-    <div className="relative w-full h-full flex flex-col overflow-hidden" style={{ background: 'var(--board-bg)' }}>
+    <div
+      className="relative flex flex-col overflow-hidden"
+      style={{ height: '100dvh', background: 'var(--board-bg)' }}
+    >
 
       {/* ─── TOP BAR ─────────────────────────────────────────────────────── */}
       <header className="z-[1000] shrink-0 bg-paper-white border-b border-ink">
