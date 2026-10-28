@@ -655,6 +655,7 @@ const MapView: React.FC<MapViewProps> = ({
 
       // Data-driven interpolation: lebih banyak laporan = lebih gelap merah
       // Bangun match expression: ['match', ['downcase', ['get','name']], kec1, color1, ..., fallback]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const matchExpr: any[] = ['match', ['downcase', ['get', 'name']]];
 
       for (const item of data) {
@@ -678,7 +679,8 @@ const MapView: React.FC<MapViewProps> = ({
 
       matchExpr.push('#E8E0D4'); // fallback (kecamatan tanpa laporan)
 
-      map.setPaintProperty('kecamatan-fill', 'fill-color', matchExpr);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      map.setPaintProperty('kecamatan-fill', 'fill-color', matchExpr as any);
       map.setPaintProperty('kecamatan-fill', 'fill-opacity', 0.65);
     },
     []
