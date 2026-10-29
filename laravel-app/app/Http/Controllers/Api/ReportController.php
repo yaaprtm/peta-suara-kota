@@ -245,23 +245,32 @@ class ReportController extends Controller
 
         $detectedKecamatan = $validation['kecamatan'];
 
-        // Upload media files
+        // Upload media files — tangkap error agar laporan tetap bisa disimpan tanpa foto
         $photoPaths = [];
         if ($request->hasFile('photos')) {
-            $photoPaths = StorageService::storeFiles(
-                $request->file('photos'),
-                'photos',
-                'public'
-            );
+            try {
+                $photoPaths = StorageService::storeFiles(
+                    $request->file('photos'),
+                    'photos',
+                    'public'
+                );
+            } catch (\Throwable $e) {
+                // Log error tapi lanjutkan tanpa foto
+                \Log::warning('Photo upload failed: ' . $e->getMessage());
+            }
         }
 
         $audioPath = null;
         if ($request->hasFile('audio')) {
-            $audioPath = StorageService::storeFile(
-                $request->file('audio'),
-                'audio',
-                'public'
-            );
+            try {
+                $audioPath = StorageService::storeFile(
+                    $request->file('audio'),
+                    'audio',
+                    'public'
+                );
+            } catch (\Throwable $e) {
+                \Log::warning('Audio upload failed: ' . $e->getMessage());
+            }
         }
 
         // Urgency scoring
