@@ -99,10 +99,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        const { refreshToken } = get();
+        const { accessToken } = get();
         try {
-          if (refreshToken && !refreshToken.startsWith('mock-token')) await authApi.logout(refreshToken);
-        } catch {}
+          // FIX: gunakan accessToken (bukan refreshToken) sebagai Bearer untuk logout
+          // karena AuthenticateWithToken middleware membaca Bearer token, bukan refreshToken
+          if (accessToken && !accessToken.startsWith('mock-token')) await authApi.logout(accessToken);
+        } catch {
+          // Abaikan error logout — tetap hapus token lokal
+        }
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         set({ user: null, accessToken: null, refreshToken: null });

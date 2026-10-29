@@ -39,6 +39,11 @@ class EnsureUserHasRole
             return $next($request);
         }
 
+        // Allow ADMIN/SUPERADMIN if PETUGAS is requested
+        if (in_array('PETUGAS', $allowedRoles, true) && in_array($userRole, ['ADMIN', 'SUPERADMIN'], true)) {
+            return $next($request);
+        }
+
         if ($request->expectsJson() || $request->is('api/*')) {
             return response()->json([
                 'message' => 'Akses ditolak. Anda tidak memiliki izin untuk mengakses halaman ini.',

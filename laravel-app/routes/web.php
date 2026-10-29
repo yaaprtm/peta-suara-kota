@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// ─── Public Pages ─────────────────────────────────────────────────────────────
+// ═══ Public Pages ═══════════════════════════════════════════════════════════
 
 Route::get('/', function () {
     return Inertia::render('Landing');
@@ -23,12 +23,12 @@ Route::get('/laporan/{id}', function (string $id) {
     ]);
 })->name('reports.show');
 
-// ─── Direct Reporting Entry ──────────────────────────────────────────────────
+// ═══ Direct Reporting Entry ══════════════════════════════════════════════════
 Route::get('/lapor', function () {
     return redirect()->route('peta', ['lapor' => 'true']);
 })->middleware('auth')->name('reports.create');
 
-// ─── Protected Role-Based Pages ──────────────────────────────────────────────
+// ═══ Protected Role-Based Pages ══════════════════════════════════════════════
 
 Route::middleware(['auth', 'role:WARGA'])->group(function () {
     Route::get('/dashboard', function () {
@@ -52,19 +52,14 @@ Route::middleware(['auth', 'role:ADMIN,SUPERADMIN'])->group(function () {
     })->name('admin.master');
 });
 
-// ─── Auth Routes ──────────────────────────────────────────────────────────────
-
-Route::get('/login', function () {
-    return Inertia::render('Auth/Login');
-})->name('login');
-
-Route::get('/register', function () {
-    return Inertia::render('Auth/Register');
-})->name('register');
+// ═══ Auth Routes (login & register ditangani oleh auth.php) ══════════════════
+// CATATAN: Route GET /login dan GET /register TIDAK didefinisikan di sini
+// karena sudah ada di auth.php (via require di bawah). Mendefinisikan
+// dua kali akan menyebabkan route name conflict dan POST tidak berfungsi.
 
 require __DIR__.'/auth.php';
 
-// ─── Fallback Graceful Route ──────────────────────────────────────────────────
+// ═══ Fallback Graceful Route ══════════════════════════════════════════════════
 Route::fallback(function () {
     return redirect()->route('landing');
 });

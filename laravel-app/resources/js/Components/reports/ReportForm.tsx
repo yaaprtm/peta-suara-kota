@@ -117,11 +117,11 @@ const ReportForm: React.FC<ReportFormProps> = ({
             (d) => d.name.toLowerCase() === match.name.toLowerCase()
           );
           if (found) setSelectedDistrict(found);
-          toast.success(`📍 Lokasi GPS ditemukan (akurasi ±${accuracy}m)`);
+          toast.success(`\uD83D\uDCCD Lokasi GPS ditemukan (akurasi ~${accuracy}m)`);
         } catch {
           setGpsLocation({ lat, lng });
           setGpsAccuracy(accuracy);
-          toast.success(`📍 Lokasi GPS ditemukan (akurasi ±${accuracy}m)`);
+          toast.success(`\uD83D\uDCCD Lokasi GPS ditemukan (akurasi ~${accuracy}m)`);
         }
         setIsGettingGPS(false);
       },

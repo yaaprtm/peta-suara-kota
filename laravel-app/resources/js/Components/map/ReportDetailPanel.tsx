@@ -40,7 +40,8 @@ const ReportDetailPanel: React.FC = () => {
   const [pendingStatus, setPendingStatus] = useState<Report['status'] | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const isPetugas = user?.role === 'PETUGAS' || user?.role === 'ADMIN';
+  // FIX: tambahkan SUPERADMIN agar bisa mengubah status laporan
+  const isPetugas = user?.role === 'PETUGAS' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
 
   const handleStatusUpdate = useCallback(
     async (status: Report['status']) => {

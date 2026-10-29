@@ -34,12 +34,9 @@ const WargaDashboardPage: React.FC = () => {
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const myReports = useMemo(() => {
-    const userName = user?.name?.toLowerCase();
-    return reports.filter(r => {
-      return r.user?.name?.toLowerCase().includes('budi') ||
-             r.user?.name?.toLowerCase() === userName ||
-             r.userId === user?.id;
-    });
+    // FIX: hapus filter hardcode nama 'budi' — hanya tampilkan laporan milik user yang login
+    if (!user?.id) return reports.slice(0, 5);
+    return reports.filter(r => r.userId === user.id || r.user?.id === user.id);
   }, [reports, user]);
 
   const displayMyReports = myReports.length > 0 ? myReports : reports.slice(0, 3);

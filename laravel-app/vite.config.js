@@ -10,6 +10,9 @@ export default defineConfig({
         }),
         react(),
     ],
+    esbuild: {
+        drop: ['debugger'],
+    },
     build: {
         rollupOptions: {
             output: {
@@ -44,13 +47,7 @@ export default defineConfig({
             },
         },
         chunkSizeWarningLimit: 600,
-        minify: 'terser',
-        terserOptions: {
-            compress: {
-                drop_console: true,
-                drop_debugger: true,
-            },
-        },
+        minify: 'esbuild',
     },
     optimizeDeps: {
         include: [

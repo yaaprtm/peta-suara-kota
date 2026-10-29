@@ -43,28 +43,12 @@ async function request<T>(
   });
 
   if (res.status === 401) {
-    const refreshed = await tryRefreshToken();
-    if (refreshed) {
-      const newToken = localStorage.getItem('accessToken');
-      if (newToken) {
-        headers['Authorization'] = `Bearer ${newToken}`;
-      }
-      const retryRes = await fetch(`${BASE_URL}${endpoint}`, {
-        ...options,
-        headers,
-        credentials: 'same-origin',
-      });
-      if (!retryRes.ok) {
-        const err = await retryRes.json().catch(() => ({ message: 'Request failed' }));
-        throw new Error(err.message || 'Request failed');
-      }
-      return retryRes.json();
-    } else {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      // Only redirect if explicitly on a protected page
-      throw new Error('Session expired');
-    }
+    // FIX: Backend tidak memiliki endpoint /api/auth/refresh, sehingga
+    // tryRefreshToken() selalu gagal dan menyebabkan infinite retry + logout paksa.
+    // Solusi: langsung hapus token dan lempar error 'Session expired'.
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    throw new Error('Session expired');
   }
 
   if (!res.ok) {
@@ -73,31 +57,6 @@ async function request<T>(
   }
 
   return res.json();
-}
-
-async function tryRefreshToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (!refreshToken) return false;
-
-  try {
-    const res = await fetch(`${BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: JSON.stringify({ refreshToken }),
-      credentials: 'same-origin',
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('refreshToken', data.refreshToken);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 // ─── Auth API ──────────────────────────────────────────────────────────────────
@@ -115,10 +74,11 @@ export const authApi = {
       body: JSON.stringify({ email, password }),
     }),
 
-  logout: (refreshToken?: string) =>
+  logout: (_token?: string) =>
     request<void>('/auth/logout', {
       method: 'POST',
-      body: JSON.stringify({ refreshToken }),
+      // FIX: Bearer token sudah dikirim otomatis oleh fungsi request() dari localStorage.
+      // Endpoint logout tidak memerlukan body apapun.
     }),
 
   me: () => request<{ user: unknown }>('/auth/me'),

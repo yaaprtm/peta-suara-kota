@@ -81,6 +81,13 @@ class AuthController extends Controller
         ]);
 
         $user->load('kelurahan');
+
+        // FIX: Login ke session web juga agar navigasi ke halaman Inertia (/dashboard dsb) berhasil
+        Auth::login($user, true);
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+        }
+
         $token = $this->createToken($user, 'register');
 
         return response()->json([
@@ -111,6 +118,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'Akun Anda telah dinonaktifkan.'], 403);
         }
 
+        // FIX: Login ke session web juga agar navigasi ke halaman Inertia (/dashboard dsb) berhasil
+        Auth::login($user, true);
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+        }
+
         $token = $this->createToken($user, 'login');
 
         return response()->json([
@@ -132,6 +145,15 @@ class AuthController extends Controller
             DB::table('personal_access_tokens')
                 ->where('token', hash('sha256', $bearerToken))
                 ->delete();
+        }
+
+        // Logout web session jika ada
+        if (Auth::check()) {
+            Auth::guard('web')->logout();
+            if ($request->hasSession()) {
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
         }
 
         return response()->json(['message' => 'Logout berhasil']);

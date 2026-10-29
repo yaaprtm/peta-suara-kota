@@ -37,6 +37,7 @@ class AuthenticateWithToken
 
                 $user = User::find($tokenRecord->tokenable_id);
                 if ($user && $user->is_active) {
+                    \Illuminate\Support\Facades\Auth::setUser($user);
                     $request->setUserResolver(fn() => $user);
                     return $next($request);
                 }

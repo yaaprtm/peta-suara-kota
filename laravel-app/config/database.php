@@ -63,30 +63,48 @@ return [
                 $options = [];
                 $ca = env('MYSQL_ATTR_SSL_CA');
                 if ($ca && is_file($ca)) {
+                    // CA cert eksplisit dari env
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
+                    $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
                 } elseif (env('DB_PORT') == '4000' || env('MYSQL_SSL')) {
-                    // TiDB Cloud wajib TLS — cari CA cert di lokasi umum
+                    // TiDB Cloud wajib TLS — cari CA cert di berbagai lokasi (Linux, macOS, Windows)
                     $caPaths = [
+                        // Linux (Debian/Ubuntu)
                         '/etc/ssl/certs/ca-certificates.crt',
+                        // Linux (RedHat/CentOS)
                         '/etc/pki/tls/certs/ca-bundle.crt',
                         '/etc/ssl/ca-bundle.pem',
+                        // macOS (Homebrew/sistem)
+                        '/usr/local/etc/openssl/cert.pem',
+                        '/usr/local/etc/openssl@3/cert.pem',
+                        '/etc/ssl/cert.pem',
+                        // Windows — PHP bundled cert
                         'C:/Windows/System32/curl-ca-bundle.crt',
+                        // Windows — XAMPP
                         'C:/xampp/apache/bin/curl-ca-bundle.crt',
+                        'C:/xampp/php/extras/ssl/cacert.pem',
+                        // Windows — WAMP
+                        'C:/wamp64/bin/php/php8.3.0/extras/ssl/cacert.pem',
+                        // Windows — Laragon
+                        'C:/laragon/etc/ssl/cacert.pem',
+                        // PHP default bundled (php.ini openssl.cafile)
+                        ini_get('openssl.cafile') ?: '',
+                        // Lokasi cacert.pem jika di-download manual
+                        dirname(__DIR__) . '/cacert.pem',
                     ];
                     $found = false;
                     foreach ($caPaths as $certPath) {
-                        if (is_file($certPath)) {
+                        if ($certPath && is_file($certPath)) {
                             $options[PDO::MYSQL_ATTR_SSL_CA] = $certPath;
                             $found = true;
                             break;
                         }
                     }
-                    // Paksa SSL aktif
-                    $options[PDO::MYSQL_ATTR_SSL_CIPHER] = 'HIGH:!DH';
-                    // Jika tidak ada CA file, skip verifikasi cert (aman untuk dev)
-                    if (!$found || env('MYSQL_ATTR_SSL_VERIFY_SERVER_CERT') === 'false') {
-                        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
-                    }
+                    // Paksa SSL init command (diperlukan TiDB Cloud)
+                    $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET NAMES utf8mb4';
+                    // Skip verifikasi cert server (aman untuk development/cloud serverless)
+                    // MYSQL_ATTR_SSL_VERIFY_SERVER_CERT=false karena TiDB Cloud pakai wildcard cert
+                    $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
                 }
                 return $options;
             })() : [],
