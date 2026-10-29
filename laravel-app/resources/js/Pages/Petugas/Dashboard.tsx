@@ -159,9 +159,7 @@ const PetugasDashboardPage: React.FC = () => {
       <header className="bg-navy text-white px-4 py-3 border-b border-navy-700 sticky top-0 z-30 shadow-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-orange flex items-center justify-center text-navy-900 font-bold shadow-sm">
-              <IconShield className="w-5 h-5" />
-            </div>
+            <img src="/patrol-logo.png" alt="PATROL" className="w-8 h-8 object-contain shrink-0" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-sm sm:text-base text-white tracking-tight leading-none">

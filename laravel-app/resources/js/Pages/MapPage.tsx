@@ -14,7 +14,8 @@ import ReportDetailPanel from '@/Components/map/ReportDetailPanel';
 import TimeSlider from '@/Components/map/TimeSlider';
 import ReportForm from '@/Components/reports/ReportForm';
 import { LoadingSpinner, UrgencyBadge, getCategoryIcon } from '@/Components/ui/Badges';
-import { SurabayaLogoMark, IllustrationTuguPahlawanUmbrella } from '@/Components/ui/SurabayaIllustrations';
+import { IllustrationTuguPahlawanUmbrella } from '@/Components/ui/SurabayaIllustrations';
+import PatrolLogo from '@/Components/ui/PatrolLogo';
 import { LanguageTogglePaper } from '@/Components/ui/LanguageToggle';
 import { useReportsStore } from '@/stores/reportsStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -139,18 +140,7 @@ const MapPage: React.FC = () => {
 
           {/* Brand */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <SurabayaLogoMark className="w-7 h-7 shrink-0" />
-            <div className="flex items-baseline gap-2 min-w-0">
-              <span className="font-serif font-bold text-xl text-ink leading-none whitespace-nowrap tracking-tight">
-                {t('map.wordmark')}
-              </span>
-              <span
-                className="font-mono text-[9px] px-1.5 py-0.5 border border-ink shrink-0 hidden sm:inline-block"
-                style={{ background: 'var(--paper-kraft)', color: 'var(--ink)', borderRadius: '2px' }}
-              >
-                {t('map.surabayaTag')}
-              </span>
-            </div>
+            <PatrolLogo size={36} variant="dark" className="shrink-0" />
           </div>
 
           {/* Nav + Actions */}
@@ -339,7 +329,7 @@ const MapPage: React.FC = () => {
                 style={{ background: 'var(--paper-kraft)' }}
               >
                 <div className="flex items-center gap-2 text-ink">
-                  <SurabayaLogoMark className="w-5 h-5" />
+                  <img src="/patrol-logo.png" alt="PATROL" className="w-5 h-5 object-contain" />
                   <h3 className="font-sans font-bold text-sm text-ink tracking-wide">
                     {t('map.formHeader')}
                   </h3>

@@ -3,12 +3,12 @@
 const en = {
   // ── Common / Shared ──────────────────────────────────────────────────────────
   common: {
-    appName: 'City Voice Map',
-    appSubtitle: 'MUNICIPALITY OF SURABAYA',
+    appName: 'PATROL',
+    appSubtitle: 'SUARA KOTA SURABAYA',
     back: 'Back',
     backToHome: 'Back to Public Home',
     loading: 'Loading...',
-    loadingApp: 'Loading City Voice Map Surabaya...',
+    loadingApp: 'Loading PATROL Surabaya...',
     save: 'Save',
     cancel: 'Cancel',
     close: 'Close',
@@ -166,7 +166,7 @@ const en = {
 
   // ── Map Page ──────────────────────────────────────────────────────────────────
   map: {
-    wordmark: 'City Voice Map',
+    wordmark: 'PATROL',
     surabayaTag: 'SURABAYA',
     reportCta: 'Report!',
     reportCtaShort: 'Report',

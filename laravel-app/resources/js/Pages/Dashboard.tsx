@@ -68,9 +68,7 @@ const WargaDashboardPage: React.FC = () => {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-navy flex items-center justify-center text-white font-bold shadow-sm">
-              <IconBuildingCommunity className="w-5 h-5 text-orange" />
-            </div>
+            <img src="/patrol-logo.png" alt="PATROL" className="w-8 h-8 object-contain shrink-0" />
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] bg-orange/20 text-orange-800 font-bold px-1.5 py-0.5 rounded uppercase">

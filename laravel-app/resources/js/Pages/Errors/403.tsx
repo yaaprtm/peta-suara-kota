@@ -21,8 +21,9 @@ const Error403: React.FC<Error403Props> = ({ status = 403, message }) => {
       {/* Header bar */}
       <header className="max-w-4xl mx-auto w-full flex items-center justify-between border-b border-[#E8D9B5] pb-4">
         <Link href="/" className="flex items-center gap-2 group">
+          <img src="/patrol-logo.png" alt="PATROL" className="w-8 h-8 object-contain" />
           <span className="font-['Caveat'] text-2xl font-bold tracking-tight text-[#2B2822]">
-            Peta Suara Kota
+            PATROL
           </span>
           <span className="text-[10px] font-['Courier_Prime'] uppercase tracking-widest text-[#7A7265] border border-[#E8D9B5] px-1.5 py-0.5 rounded">
             SURABAYA
@@ -82,7 +83,7 @@ const Error403: React.FC<Error403Props> = ({ status = 403, message }) => {
       {/* Footer */}
       <footer className="max-w-4xl mx-auto w-full text-center border-t border-[#E8D9B5] pt-4">
         <p className="text-[11px] font-['Courier_Prime'] text-[#7A7265]">
-          Peta Suara Kota Surabaya - Sistem Keamanan Terpadu
+          PATROL Surabaya - Sistem Keamanan Terpadu
         </p>
       </footer>
     </div>

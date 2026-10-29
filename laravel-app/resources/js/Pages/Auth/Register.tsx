@@ -54,8 +54,8 @@ const RegisterPage: React.FC = () => {
         <div className="bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-sm">
           {/* Header */}
           <div className="text-center pb-5 mb-5 border-b border-slate-100">
-            <div className="w-12 h-12 rounded-xl bg-navy flex items-center justify-center text-white mx-auto mb-2 shadow-sm">
-              <IconBuildingCommunity className="w-6 h-6 text-orange" />
+            <div className="w-16 h-16 mx-auto mb-2">
+              <img src="/patrol-logo.png" alt="PATROL" className="w-full h-full object-contain" />
             </div>
             <h1 className="font-bold text-lg text-navy tracking-tight">
               {t('auth.registerTitle')}

@@ -19,7 +19,7 @@
         <meta name="twitter:title" content="Peta Suara Kota Surabaya">
         <meta name="twitter:description" content="Command Center Pelaporan Masalah & Aspirasi Warga Kota Surabaya.">
 
-        <title inertia>{{ config('app.name', 'Peta Suara Kota Surabaya') }}</title>
+        <title inertia>{{ config('app.name', 'PATROL') }}</title>
 
         <!-- Google Fonts: Inter, Fraunces, Courier Prime, Caveat -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
