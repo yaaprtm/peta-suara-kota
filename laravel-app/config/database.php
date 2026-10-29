@@ -65,15 +65,27 @@ return [
                 if ($ca && is_file($ca)) {
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
                 } elseif (env('DB_PORT') == '4000' || env('MYSQL_SSL')) {
-                    foreach ([
+                    // TiDB Cloud wajib TLS — cari CA cert di lokasi umum
+                    $caPaths = [
                         '/etc/ssl/certs/ca-certificates.crt',
                         '/etc/pki/tls/certs/ca-bundle.crt',
                         '/etc/ssl/ca-bundle.pem',
-                    ] as $certPath) {
+                        'C:/Windows/System32/curl-ca-bundle.crt',
+                        'C:/xampp/apache/bin/curl-ca-bundle.crt',
+                    ];
+                    $found = false;
+                    foreach ($caPaths as $certPath) {
                         if (is_file($certPath)) {
                             $options[PDO::MYSQL_ATTR_SSL_CA] = $certPath;
+                            $found = true;
                             break;
                         }
+                    }
+                    // Paksa SSL aktif
+                    $options[PDO::MYSQL_ATTR_SSL_CIPHER] = 'HIGH:!DH';
+                    // Jika tidak ada CA file, skip verifikasi cert (aman untuk dev)
+                    if (!$found || env('MYSQL_ATTR_SSL_VERIFY_SERVER_CERT') === 'false') {
+                        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
                     }
                 }
                 return $options;
