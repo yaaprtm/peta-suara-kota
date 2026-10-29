@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Link, router } from '@inertiajs/react';
 import {
   IconShield,
@@ -16,15 +16,23 @@ import {
   IconExternalLink,
   IconCurrentLocation,
   IconCircleDot,
+  IconPhoto,
+  IconTrash,
+  IconHistory,
+  IconAlertCircle,
+  IconCircleCheck,
+  IconLoader2,
 } from '@tabler/icons-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, formatDistanceToNow, differenceInHours } from 'date-fns';
+import { id as localeId } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { useReportsStore } from '@/stores/reportsStore';
 import { useAuthStore } from '@/stores/authStore';
-import { Report, ReportCategory, ReportStatus, UrgencyLevel, getUrgencyLevel, STATUS_LABELS, CATEGORY_LABELS } from '@/types';
+import { Report, ReportCategory, ReportStatus, UrgencyLevel, getUrgencyLevel, getUrgencyColor, STATUS_LABELS, CATEGORY_LABELS } from '@/types';
 import { UrgencyBadge, StatusBadge, CategoryBadge, Avatar } from '@/Components/ui/Badges';
 import { LanguageToggleDark } from '@/Components/ui/LanguageToggle';
 import { useTranslation } from '@/i18n/useTranslation';
+import { reportsApi } from '@/lib/api';
 
 const PetugasDashboardPage: React.FC = () => {
   const navigate = (url: string) => router.visit(url);
@@ -42,6 +50,14 @@ const PetugasDashboardPage: React.FC = () => {
   const [actionNote, setActionNote] = useState('');
   const [showRekapModal, setShowRekapModal] = useState(false);
   const [mobileTab, setMobileTab] = useState<'queue' | 'map'>('queue');
+
+  // ── Action Modal — enhanced state ────────────────────────────────────────
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionFullReport, setActionFullReport] = useState<Report | null>(null); // loaded with statusLogs
+  const [completionPhotos, setCompletionPhotos] = useState<File[]>([]);
+  const [completionPhotosPreviews, setCompletionPhotosPreviews] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'action' | 'timeline' | 'bukti'>('action');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── GIS: Nearby Me ──────────────────────────────────────────────────────
   const [nearbyReports, setNearbyReports] = useState<(Report & { distanceKm: number })[]>([]);
@@ -134,23 +150,122 @@ const PetugasDashboardPage: React.FC = () => {
     return { total, baru, diproses, selesai, urgentCount };
   }, [reports]);
 
-  const handleOpenAction = (report: Report) => {
+  const handleOpenAction = async (report: Report) => {
     setActionReport(report);
     setActionStatus(report.status === 'BARU' ? 'DIPROSES' : report.status === 'DIPROSES' ? 'SELESAI' : 'DIPROSES');
     setActionNote('');
+    setCompletionPhotos([]);
+    setCompletionPhotosPreviews([]);
+    setActiveTab('action');
+    setActionFullReport(null);
+    // Fetch full report dengan statusLogs
+    try {
+      const res = await reportsApi.get(report.id);
+      setActionFullReport(res.report);
+    } catch {
+      // fallback ke data laporan yang sudah ada
+      setActionFullReport(report);
+    }
   };
 
-  const handleSaveAction = (e: React.FormEvent) => {
+  const handleCompletionPhotosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + completionPhotos.length > 4) {
+      toast.error('Maksimal 4 foto bukti penyelesaian');
+      return;
+    }
+    const newFiles = [...completionPhotos, ...files].slice(0, 4);
+    setCompletionPhotos(newFiles);
+    // Generate previews
+    const previews = newFiles.map(f => URL.createObjectURL(f));
+    setCompletionPhotosPreviews(previews);
+  };
+
+  const handleRemoveCompletionPhoto = (idx: number) => {
+    const newFiles = completionPhotos.filter((_, i) => i !== idx);
+    setCompletionPhotos(newFiles);
+    setCompletionPhotosPreviews(newFiles.map(f => URL.createObjectURL(f)));
+  };
+
+  // SLA helpers — target berdasarkan level urgensi
+  const getSlaTargetHours = (score: number) => {
+    if (score >= 80) return 2;   // kritis
+    if (score >= 60) return 8;   // tinggi
+    if (score >= 35) return 24;  // sedang
+    return 72;                    // rendah
+  };
+
+  const getSlaStatus = (report: Report) => {
+    const hoursElapsed = differenceInHours(new Date(), parseISO(report.createdAt));
+    const target = getSlaTargetHours(report.skorUrgensi);
+    const remaining = target - hoursElapsed;
+    const pct = Math.min(100, Math.round((hoursElapsed / target) * 100));
+    return {
+      hoursElapsed,
+      target,
+      remaining,
+      pct,
+      isOverdue: remaining < 0,
+      isWarning: remaining >= 0 && remaining < target * 0.2,
+    };
+  };
+
+  const handleSaveAction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!actionReport) return;
-    updateReportStatus(
-      actionReport.id,
-      actionStatus,
-      actionNote || `${t('status.' + actionStatus as any)}`,
-      { id: user?.id || 'petugas-cc', name: user?.name || 'Petugas Command Center', role: user?.role || 'PETUGAS' }
-    );
-    toast.success(t('petugas.toastUpdated', { status: t(`status.${actionStatus}` as any) }));
-    setActionReport(null);
+
+    // Wajib catatan untuk SELESAI atau DITOLAK
+    if ((actionStatus === 'SELESAI' || actionStatus === 'DITOLAK') && !actionNote.trim()) {
+      toast.error('Catatan wajib diisi untuk status ini.');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      // Jika ada foto upload, kirim sebagai FormData
+      if (completionPhotos.length > 0 && actionStatus === 'SELESAI') {
+        const formData = new FormData();
+        formData.append('status', actionStatus);
+        formData.append('note', actionNote);
+        formData.append('completion_note', actionNote);
+        completionPhotos.forEach(f => formData.append('completion_photos[]', f));
+        // Kirim sebagai multipart
+        await fetch(`/api/reports/${actionReport.id}/status`, {
+          method: 'PATCH',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+        });
+      } else {
+        await reportsApi.updateStatus(
+          actionReport.id,
+          actionStatus,
+          actionNote,
+          actionStatus === 'SELESAI' ? { completionNote: actionNote } : undefined
+        );
+      }
+
+      // Update store lokal
+      updateReportStatus(
+        actionReport.id,
+        actionStatus,
+        actionNote,
+        { id: user?.id || 'petugas-cc', name: user?.name || 'Petugas', role: user?.role || 'PETUGAS' },
+        actionStatus === 'SELESAI' ? { completionNote: actionNote } : undefined
+      );
+
+      toast.success(`✅ Status diperbarui: ${STATUS_LABELS[actionStatus]}`);
+      setActionReport(null);
+      setActionFullReport(null);
+      setCompletionPhotos([]);
+      setCompletionPhotosPreviews([]);
+      // Refresh data
+      fetchReports();
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal memperbarui status. Coba lagi.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
@@ -507,62 +622,374 @@ const PetugasDashboardPage: React.FC = () => {
         </div>
       </main>
 
-      {/* Action Dialog */}
-      {actionReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
-            <div className="bg-navy px-4 py-3 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <IconShield className="w-4 h-4 text-orange" />
-                <h3 className="font-bold text-xs uppercase tracking-wider">{t('petugas.actionDialogTitle')}</h3>
+      {/* ═══ Action Dialog — Enhanced ═══════════════════════════════════════ */}
+      {actionReport && (() => {
+        const sla = getSlaStatus(actionReport);
+        const displayReport = actionFullReport || actionReport;
+        const logs = displayReport.statusLogs || [];
+        const beforePhotos = actionReport.photos || [];
+
+        // Status yang boleh dipilih (semua 4 status + highlight current)
+        const statusOptions: { value: ReportStatus; label: string; color: string; bg: string }[] = [
+          { value: 'BARU',     label: 'Baru',     color: 'text-sky-700',     bg: 'bg-sky-50 border-sky-200'     },
+          { value: 'DIPROSES', label: 'Diproses', color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200'   },
+          { value: 'SELESAI',  label: 'Selesai',  color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+          { value: 'DITOLAK',  label: 'Ditolak',  color: 'text-red-700',     bg: 'bg-red-50 border-red-200'     },
+        ];
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/70 backdrop-blur-sm p-3">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col max-h-[92vh]">
+
+              {/* ── Header ── */}
+              <div className="bg-navy px-5 py-3.5 text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <IconShield className="w-4 h-4 text-orange" />
+                  <div>
+                    <h3 className="font-bold text-sm uppercase tracking-wider leading-none">Tindakan Lapangan</h3>
+                    <p className="text-[10px] text-slate-300 mt-0.5 font-mono">{actionReport.trackingCode || actionReport.id.slice(0, 10).toUpperCase()}</p>
+                  </div>
+                </div>
+                <button onClick={() => { setActionReport(null); setActionFullReport(null); }} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10">
+                  <IconX className="w-4 h-4" />
+                </button>
               </div>
-              <button onClick={() => setActionReport(null)} className="text-slate-400 hover:text-white">
-                <IconX className="w-4 h-4" />
-              </button>
-            </div>
-            <form onSubmit={handleSaveAction} className="p-4 space-y-3.5 text-xs">
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 block font-mono">{t('petugas.actionDialogReport')}</span>
-                <h4 className="font-bold text-navy text-xs line-clamp-1">{actionReport.title}</h4>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">{t('petugas.changeStatusTo')}</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['BARU', 'DIPROSES', 'SELESAI'] as ReportStatus[]).map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => setActionStatus(st)}
-                      className={`py-2 text-xs rounded-lg font-medium border text-center transition-all ${
-                        actionStatus === st ? 'bg-navy text-white border-navy font-bold shadow-xs' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {t(`status.${st}` as any)}
-                    </button>
-                  ))}
+
+              {/* ── Info Laporan + SLA Bar ── */}
+              <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 shrink-0 space-y-2.5">
+                {/* Judul + badges */}
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-navy text-sm line-clamp-2 leading-snug">{actionReport.title}</h4>
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      <UrgencyBadge score={actionReport.skorUrgensi} />
+                      <CategoryBadge category={actionReport.category} />
+                      <StatusBadge status={actionReport.status} />
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {formatDistanceToNow(parseISO(actionReport.createdAt), { addSuffix: true, locale: localeId })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SLA Timer */}
+                <div className={`rounded-lg p-2.5 border text-xs ${
+                  sla.isOverdue ? 'bg-red-50 border-red-200' :
+                  sla.isWarning ? 'bg-amber-50 border-amber-200' :
+                  'bg-slate-100 border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <IconClock className={`w-3.5 h-3.5 ${sla.isOverdue ? 'text-red-600' : sla.isWarning ? 'text-amber-600' : 'text-slate-500'}`} />
+                      <span className={`font-semibold ${sla.isOverdue ? 'text-red-700' : sla.isWarning ? 'text-amber-700' : 'text-slate-600'}`}>
+                        SLA Target: {sla.target} jam
+                      </span>
+                    </div>
+                    <span className={`font-bold text-[11px] ${sla.isOverdue ? 'text-red-700' : sla.isWarning ? 'text-amber-700' : 'text-slate-600'}`}>
+                      {sla.isOverdue
+                        ? `⚠️ LEWAT ${Math.abs(sla.remaining)} jam`
+                        : `Sisa ${sla.remaining} jam`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-white/70 rounded-full h-1.5 overflow-hidden border border-slate-200">
+                    <div
+                      className={`h-full rounded-full transition-all ${sla.isOverdue ? 'bg-red-500' : sla.isWarning ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      style={{ width: `${Math.min(sla.pct, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {sla.hoursElapsed}j sejak laporan masuk · Target untuk urgensi {getUrgencyLevel(actionReport.skorUrgensi)}
+                  </p>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">{t('petugas.actionNoteLabel')}</label>
-                <textarea
-                  value={actionNote}
-                  onChange={(e) => setActionNote(e.target.value)}
-                  placeholder={t('petugas.actionNotePlaceholder')}
-                  rows={3}
-                  className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:border-navy"
-                  required
-                />
+
+              {/* ── Tab Navigation ── */}
+              <div className="flex border-b border-slate-200 bg-white shrink-0">
+                {[
+                  { key: 'action',   label: 'Ubah Status',    icon: <IconShield className="w-3.5 h-3.5" /> },
+                  { key: 'bukti',    label: `Foto (${beforePhotos.length})`, icon: <IconPhoto className="w-3.5 h-3.5" /> },
+                  { key: 'timeline', label: `Riwayat (${logs.length})`, icon: <IconHistory className="w-3.5 h-3.5" /> },
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveTab(tab.key as any)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                      activeTab === tab.key
+                        ? 'border-navy text-navy bg-navy-50/30'
+                        : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
               </div>
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button type="button" onClick={() => setActionReport(null)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs">
-                  {t('common.cancel')}
-                </button>
-                <button type="submit" className="btn-navy py-1.5 px-4 text-xs">{t('petugas.saveAction')}</button>
+
+              {/* ── Tab Content (scrollable) ── */}
+              <div className="flex-1 overflow-y-auto">
+
+                {/* Tab: Ubah Status */}
+                {activeTab === 'action' && (
+                  <form onSubmit={handleSaveAction} className="p-5 space-y-4 text-xs">
+
+                    {/* Status buttons — 4 opsi termasuk DITOLAK */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Ubah Status Menjadi</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {statusOptions.map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setActionStatus(opt.value)}
+                            disabled={opt.value === actionReport.status}
+                            className={`py-2.5 px-3 text-xs rounded-xl font-semibold border-2 text-center transition-all flex items-center justify-center gap-1.5 ${
+                              actionStatus === opt.value
+                                ? 'bg-navy text-white border-navy shadow-sm ring-2 ring-navy/20'
+                                : opt.value === actionReport.status
+                                ? 'opacity-40 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-500'
+                                : `${opt.bg} ${opt.color} hover:border-current`
+                            }`}
+                          >
+                            {opt.value === 'SELESAI' && <IconCircleCheck className="w-3.5 h-3.5" />}
+                            {opt.value === 'DITOLAK' && <IconAlertCircle className="w-3.5 h-3.5" />}
+                            {opt.value === 'DIPROSES' && <IconClock className="w-3.5 h-3.5" />}
+                            {opt.value === 'BARU' && <IconAlertTriangle className="w-3.5 h-3.5" />}
+                            {opt.label}
+                            {opt.value === actionReport.status && <span className="text-[9px] opacity-60">(saat ini)</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Catatan tindakan */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                        Catatan Tindakan Petugas
+                        {(actionStatus === 'SELESAI' || actionStatus === 'DITOLAK') && (
+                          <span className="text-red-500 ml-1">*wajib</span>
+                        )}
+                      </label>
+                      <textarea
+                        value={actionNote}
+                        onChange={(e) => setActionNote(e.target.value)}
+                        placeholder={
+                          actionStatus === 'SELESAI'
+                            ? 'Contoh: Tim DKRTH telah membersihkan lokasi pada pukul 14.30. Dokumentasi terlampir.'
+                            : actionStatus === 'DITOLAK'
+                            ? 'Contoh: Laporan duplikasi / di luar wilayah / tidak sesuai kategori.'
+                            : 'Contoh: Tim Unit Reaksi Cepat DKRTH sedang menuju lokasi...'
+                        }
+                        rows={3}
+                        required={actionStatus === 'SELESAI' || actionStatus === 'DITOLAK'}
+                        className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:outline-none focus:border-navy focus:ring-1 focus:ring-navy/30 resize-none"
+                      />
+                    </div>
+
+                    {/* Upload foto penyelesaian — hanya untuk SELESAI */}
+                    {actionStatus === 'SELESAI' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                          Foto Bukti Penyelesaian (Opsional, maks 4)
+                        </label>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleCompletionPhotosChange}
+                        />
+                        {completionPhotosPreviews.length > 0 ? (
+                          <div className="grid grid-cols-4 gap-2 mb-2">
+                            {completionPhotosPreviews.map((src, i) => (
+                              <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
+                                <img src={src} alt={`Bukti ${i+1}`} className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveCompletionPhoto(i)}
+                                  className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <IconTrash className="w-3 h-3 text-white" />
+                                </button>
+                              </div>
+                            ))}
+                            {completionPhotosPreviews.length < 4 && (
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="aspect-square rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 hover:border-navy hover:text-navy transition-colors"
+                              >
+                                <IconPhoto className="w-5 h-5" />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full py-4 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-navy hover:text-navy transition-colors flex flex-col items-center gap-1.5"
+                          >
+                            <IconPhoto className="w-6 h-6" />
+                            <span className="text-xs font-medium">Upload foto after</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Footer form */}
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => { setActionReport(null); setActionFullReport(null); }}
+                        className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium"
+                        disabled={actionLoading}
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={actionLoading}
+                        className={`px-5 py-2 rounded-xl text-white text-xs font-bold flex items-center gap-2 transition-colors ${
+                          actionStatus === 'DITOLAK'
+                            ? 'bg-red-600 hover:bg-red-700'
+                            : actionStatus === 'SELESAI'
+                            ? 'bg-emerald-600 hover:bg-emerald-700'
+                            : 'bg-navy hover:bg-navy-700'
+                        } disabled:opacity-60`}
+                      >
+                        {actionLoading ? (
+                          <><IconLoader2 className="w-3.5 h-3.5 animate-spin" /> Menyimpan…</>
+                        ) : (
+                          <><IconCheck className="w-3.5 h-3.5" /> Simpan Tindakan</>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Tab: Foto Bukti (Before & After) */}
+                {activeTab === 'bukti' && (
+                  <div className="p-5 space-y-4 text-xs">
+                    {/* Before photos */}
+                    <div>
+                      <h4 className="font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-orange shrink-0" />
+                        Foto Pelaporan (Before) — {beforePhotos.length} foto
+                      </h4>
+                      {beforePhotos.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-2">
+                          {beforePhotos.map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-lg overflow-hidden border border-slate-200 block hover:opacity-80 transition-opacity">
+                              <img src={url} alt={`Before ${i+1}`} className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-slate-400 italic text-center py-4">Tidak ada foto dalam laporan</p>
+                      )}
+                    </div>
+
+                    {/* After photos */}
+                    <div>
+                      <h4 className="font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                        Foto Penyelesaian (After) — {(displayReport.completionPhotos || []).length} foto
+                      </h4>
+                      {(displayReport.completionPhotos || []).length > 0 ? (
+                        <div className="grid grid-cols-3 gap-2">
+                          {(displayReport.completionPhotos || []).map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-lg overflow-hidden border border-emerald-200 block hover:opacity-80">
+                              <img src={url} alt={`After ${i+1}`} className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-6 text-center border-2 border-dashed border-slate-200 rounded-xl">
+                          <IconPhoto className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          <p className="text-slate-400 text-xs">Belum ada foto penyelesaian</p>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('action')}
+                            className="mt-2 text-navy font-semibold text-[11px] underline"
+                          >
+                            Upload di tab Ubah Status → pilih SELESAI
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Catatan penyelesaian */}
+                    {displayReport.completionNote && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                        <p className="font-semibold text-emerald-700 mb-1 uppercase tracking-wider text-[10px]">Catatan Penyelesaian</p>
+                        <p className="text-slate-700 leading-relaxed">{displayReport.completionNote}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab: Riwayat Timeline */}
+                {activeTab === 'timeline' && (
+                  <div className="p-5 text-xs">
+                    {!actionFullReport ? (
+                      <div className="flex items-center justify-center py-8 gap-2 text-slate-400">
+                        <IconLoader2 className="w-4 h-4 animate-spin" />
+                        <span>Memuat riwayat…</span>
+                      </div>
+                    ) : logs.length === 0 ? (
+                      <p className="text-center text-slate-400 py-8 italic">Belum ada riwayat perubahan status</p>
+                    ) : (
+                      <div className="relative">
+                        {/* Garis vertikal timeline */}
+                        <div className="absolute left-3.5 top-0 bottom-0 w-px bg-slate-200" />
+                        <div className="space-y-4">
+                          {logs.map((log, i) => {
+                            const statusColors: Record<string, string> = {
+                              BARU: 'bg-sky-500',
+                              DIPROSES: 'bg-amber-500',
+                              SELESAI: 'bg-emerald-500',
+                              DITOLAK: 'bg-red-500',
+                            };
+                            return (
+                              <div key={log.id || i} className="relative flex gap-4 pl-8">
+                                {/* Dot */}
+                                <div className={`absolute left-2 top-1 w-3 h-3 rounded-full border-2 border-white ${statusColors[log.toStatus] || 'bg-slate-400'} z-10`} />
+                                {/* Content */}
+                                <div className="flex-1 bg-slate-50 rounded-xl p-3 border border-slate-200">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <StatusBadge status={log.toStatus} />
+                                    <span className="font-mono text-[10px] text-slate-400 shrink-0">
+                                      {format(parseISO(log.changedAt), 'dd MMM yyyy HH:mm')}
+                                    </span>
+                                  </div>
+                                  {log.fromStatus && (
+                                    <p className="text-slate-400 text-[10px] mb-1">
+                                      dari <span className="font-medium">{STATUS_LABELS[log.fromStatus]}</span>
+                                      {' → '}
+                                      <span className="font-medium">{STATUS_LABELS[log.toStatus]}</span>
+                                    </p>
+                                  )}
+                                  {log.note && (
+                                    <p className="text-slate-600 leading-relaxed">{log.note}</p>
+                                  )}
+                                  <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
+                                    👤 {log.changedBy?.name || 'Sistem'} ({log.changedBy?.role || '—'})
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Rekap Modal */}
       {showRekapModal && (
