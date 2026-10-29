@@ -39,7 +39,7 @@ async function request<T>(
   const res = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
     headers,
-    credentials: 'same-origin',
+    credentials: 'include',
   });
 
   if (res.status === 401) {

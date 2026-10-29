@@ -81,13 +81,6 @@ class AuthController extends Controller
         ]);
 
         $user->load('kelurahan');
-
-        // FIX: Login ke session web juga agar navigasi ke halaman Inertia (/dashboard dsb) berhasil
-        Auth::login($user, true);
-        if ($request->hasSession()) {
-            $request->session()->regenerate();
-        }
-
         $token = $this->createToken($user, 'register');
 
         return response()->json([
@@ -125,7 +118,6 @@ class AuthController extends Controller
         }
 
         $token = $this->createToken($user, 'login');
-
         return response()->json([
             'message'      => 'Login berhasil',
             'accessToken'  => $token,

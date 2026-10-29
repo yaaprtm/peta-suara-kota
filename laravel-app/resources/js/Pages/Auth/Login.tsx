@@ -51,9 +51,9 @@ const LoginPage: React.FC = () => {
 
   const handleDemo = async (role: 'WARGA' | 'PETUGAS' | 'SUPERADMIN') => {
     const demoCreds = {
-      WARGA: { email: 'warga@surabaya.go.id', password: 'password123' },
-      PETUGAS: { email: 'petugas@surabaya.go.id', password: 'password123' },
-      SUPERADMIN: { email: 'superadmin@surabaya.go.id', password: 'password123' },
+      WARGA:      { email: 'demo@petasuarakota.id',        password: 'password123' },
+      PETUGAS:    { email: 'petugas.pu@petasuarakota.id',  password: 'password123' },
+      SUPERADMIN: { email: 'admin@petasuarakota.id',       password: 'password123' },
     };
     const cred = demoCreds[role];
     setEmail(cred.email);
@@ -62,10 +62,9 @@ const LoginPage: React.FC = () => {
       const loggedUser = await login(cred.email, cred.password);
       toast.success(t('auth.demoLogin', { role }));
       redirectByRole(loggedUser.role);
-    } catch {
-      const user = loginAsRole(role);
-      toast.success(t('auth.demoLogin', { role }));
-      redirectByRole(user.role);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : t('auth.authFailed');
+      toast.error(msg);
     }
   };
 
