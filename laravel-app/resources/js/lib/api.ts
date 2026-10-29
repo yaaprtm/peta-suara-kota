@@ -22,7 +22,19 @@ async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = localStorage.getItem('accessToken');
+  // Baca token dari localStorage langsung (set oleh authStore.login())
+  // Juga coba baca dari Zustand persist store sebagai fallback
+  let token = localStorage.getItem('accessToken');
+  if (!token) {
+    try {
+      const authStoreRaw = localStorage.getItem('auth-store');
+      if (authStoreRaw) {
+        const authStoreParsed = JSON.parse(authStoreRaw);
+        token = authStoreParsed?.state?.accessToken ?? null;
+      }
+    } catch { /* ignore */ }
+  }
+
   const csrfToken = getCsrfToken();
 
   const headers: Record<string, string> = {
@@ -39,16 +51,27 @@ async function request<T>(
   const res = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
     headers,
-    credentials: 'include',
+    credentials: 'same-origin',
   });
 
   if (res.status === 401) {
-    // FIX: Backend tidak memiliki endpoint /api/auth/refresh, sehingga
-    // tryRefreshToken() selalu gagal dan menyebabkan infinite retry + logout paksa.
-    // Solusi: langsung hapus token dan lempar error 'Session expired'.
+    // Token expired atau invalid — hapus token dan redirect ke login
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    throw new Error('Session expired');
+    // Hapus dari Zustand persist juga
+    try {
+      const raw = localStorage.getItem('auth-store');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.state) {
+          parsed.state.accessToken = null;
+          parsed.state.refreshToken = null;
+          parsed.state.user = null;
+          localStorage.setItem('auth-store', JSON.stringify(parsed));
+        }
+      }
+    } catch { /* ignore */ }
+    throw new Error('Session expired. Silakan login kembali.');
   }
 
   if (!res.ok) {
