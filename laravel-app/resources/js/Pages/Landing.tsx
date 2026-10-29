@@ -280,7 +280,7 @@ const LandingPage: React.FC = () => {
             <span className="text-orange">{t('landing.heroTitle2')}</span>
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-700 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-base text-navy max-w-2xl mx-auto leading-relaxed">
             {t('landing.heroDesc')}
           </p>
 
