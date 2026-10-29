@@ -1,23 +1,19 @@
 import React, { useState } from 'react';
 import clsx from 'clsx';
+// Import gambar langsung — Vite akan bundle dan hash filename-nya
+// sehingga tidak bergantung pada routing Vercel
+import patrolLogoSrc from '../../../public/patrol-logo.png';
 
 /**
  * PatrolLogo — Logo + nama brand PATROL
- *
  * Layout: [🖼 logo | PATROL            ]
  *                   [SUARA KOTA SURABAYA]
- *
- * Referensi: Kebun Raya Cibinong (logo kiri, nama+subtitle kanan)
  */
 
 interface PatrolLogoProps {
-  /** Tinggi logo dalam px — lebar mengikuti aspect ratio (default 40) */
   size?: number;
-  /** Tambahan className pada wrapper */
   className?: string;
-  /** Varian warna teks */
   variant?: 'dark' | 'light' | 'navy' | 'white-on-dark';
-  /** Sembunyikan subtitle (baris kedua) */
   hideSubtitle?: boolean;
 }
 
@@ -30,10 +26,10 @@ export const PatrolLogo: React.FC<PatrolLogoProps> = ({
   const [imgError, setImgError] = useState(false);
 
   const colors = {
-    dark:            { name: 'text-[#1E1B16]',   sub: 'text-[#7A6E5F]'     },
-    light:           { name: 'text-white',         sub: 'text-white/65'      },
-    navy:            { name: 'text-[#1E3A5F]',    sub: 'text-[#1E3A5F]/60'  },
-    'white-on-dark': { name: 'text-white',         sub: 'text-white/60'      },
+    dark:            { name: 'text-[#1E1B16]',  sub: 'text-[#7A6E5F]'    },
+    light:           { name: 'text-white',        sub: 'text-white/65'     },
+    navy:            { name: 'text-[#1E3A5F]',   sub: 'text-[#1E3A5F]/60' },
+    'white-on-dark': { name: 'text-white',        sub: 'text-white/60'     },
   }[variant];
 
   const nameFontSize  = Math.round(size * 0.42);
@@ -43,10 +39,10 @@ export const PatrolLogo: React.FC<PatrolLogoProps> = ({
   return (
     <div className={clsx('inline-flex items-center select-none', className)}>
 
-      {/* ── Logo image ── */}
+      {/* Logo image — di-bundle oleh Vite, tidak butuh route Vercel */}
       {!imgError ? (
         <img
-          src="/patrol-logo.png"
+          src={patrolLogoSrc}
           alt="PATROL"
           height={size}
           style={{ height: size, width: 'auto', maxWidth: size * 1.8 }}
@@ -55,7 +51,6 @@ export const PatrolLogo: React.FC<PatrolLogoProps> = ({
           onError={() => setImgError(true)}
         />
       ) : (
-        /* Fallback jika gambar gagal load */
         <div
           className="shrink-0 rounded flex items-center justify-center bg-navy text-white font-bold"
           style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
@@ -64,7 +59,7 @@ export const PatrolLogo: React.FC<PatrolLogoProps> = ({
         </div>
       )}
 
-      {/* ── Divider tipis ── */}
+      {/* Divider */}
       <div
         className={clsx(
           'mx-2.5 w-px shrink-0 opacity-25',
@@ -73,7 +68,7 @@ export const PatrolLogo: React.FC<PatrolLogoProps> = ({
         style={{ height: dividerHeight }}
       />
 
-      {/* ── Text stack ── */}
+      {/* Text stack */}
       <div className="flex flex-col justify-center leading-none">
         <span
           className={clsx('font-black tracking-[0.18em] uppercase whitespace-nowrap', colors.name)}
@@ -94,7 +89,6 @@ export const PatrolLogo: React.FC<PatrolLogoProps> = ({
   );
 };
 
-/** Versi tanpa subtitle untuk ruang sempit */
 export const PatrolLogoCompact: React.FC<
   Pick<PatrolLogoProps, 'size' | 'className' | 'variant'>
 > = (props) => <PatrolLogo {...props} hideSubtitle />;

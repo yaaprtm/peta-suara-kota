@@ -35,6 +35,38 @@
       "dest": "/public/robots.txt"
     },
     {
+      "src": "/patrol-logo.png",
+      "dest": "/public/patrol-logo.png"
+    },
+    {
+      "src": "/(.*\\.png)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.jpg)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.jpeg)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.gif)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.webp)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.svg)",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(.*\\.woff2?)",
+      "dest": "/public/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/index.php"
     }
