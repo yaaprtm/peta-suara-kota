@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type { Report, MapFilter } from '../types';
 import { reportsApi } from '../lib/api';
 import { subDays, isAfter, isBefore, parseISO } from 'date-fns';
-import { DUMMY_REPORTS } from '../data/dummyReports';
 
 interface ReportsState {
   reports: Report[];
@@ -64,8 +63,9 @@ const initialTimeRange = {
 };
 
 export const useReportsStore = create<ReportsState>((set, get) => ({
-  reports: DUMMY_REPORTS,
-  filteredReports: applyFilters(DUMMY_REPORTS, {}, initialTimeRange),
+  // State awal kosong — data diambil dari TiDB Cloud via API
+  reports: [],
+  filteredReports: [],
   selectedReport: null,
   isLoading: false,
   error: null,
@@ -84,16 +84,15 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
         reports: Report[];
         pagination: unknown;
       };
-      const reports = (data?.reports && data.reports.length > 0) ? data.reports : DUMMY_REPORTS;
+      const reports = data?.reports ?? [];
       const { filter, timeRange } = get();
       const filtered = applyFilters(reports, filter, timeRange);
       set({ reports, filteredReports: filtered, isLoading: false });
-    } catch {
-      // Fallback seamlessly to dummy reports
-      const { filter, timeRange } = get();
-      const reports = get().reports.length > 0 ? get().reports : DUMMY_REPORTS;
+    } catch (err) {
+      // Jika API gagal, pertahankan data yang sudah ada
+      const { filter, timeRange, reports } = get();
       const filtered = applyFilters(reports, filter, timeRange);
-      set({ reports, filteredReports: filtered, isLoading: false });
+      set({ filteredReports: filtered, isLoading: false, error: 'Gagal memuat laporan.' });
     }
   },
 
@@ -115,14 +114,14 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
         count: number;
       };
 
-      const reports = (data?.reports && data.reports.length > 0) ? data.reports : DUMMY_REPORTS;
+      const reports = data?.reports ?? [];
       const filtered = applyFilters(reports, filter, timeRange);
       set({ reports, filteredReports: filtered, isLoading: false });
     } catch {
-      const { filter, timeRange } = get();
-      const reports = get().reports.length > 0 ? get().reports : DUMMY_REPORTS;
+      // Pertahankan data yang sudah ada jika viewport fetch gagal
+      const { filter, timeRange, reports } = get();
       const filtered = applyFilters(reports, filter, timeRange);
-      set({ reports, filteredReports: filtered, isLoading: false });
+      set({ filteredReports: filtered, isLoading: false });
     }
   },
 
@@ -132,7 +131,6 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
 
   setFilter: (newFilter) => {
     const filter = { ...get().filter, ...newFilter };
-    // Remove undefined keys
     Object.keys(filter).forEach(k => {
       if ((filter as Record<string, unknown>)[k] === undefined) {
         delete (filter as Record<string, unknown>)[k];
@@ -165,7 +163,7 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
         toStatus: status,
         note: note || `Status diperbarui menjadi ${status}`,
         changedAt: new Date().toISOString(),
-        changedBy: changedBy || { id: 'petugas-1', name: 'Petugas Pelaksana', role: 'PETUGAS' as const },
+        changedBy: changedBy || { id: 'system', name: 'Sistem', role: 'PETUGAS' as const },
       };
       return {
         ...r,
@@ -191,10 +189,7 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
   upvoteReport: (reportId) => {
     const reports = get().reports.map(r => {
       if (r.id !== reportId) return r;
-      return {
-        ...r,
-        upvotesCount: (r.upvotesCount ?? 0) + 1,
-      };
+      return { ...r, upvotesCount: (r.upvotesCount ?? 0) + 1 };
     });
     const selectedReport = get().selectedReport;
     const updatedSelected = selectedReport?.id === reportId
@@ -205,9 +200,8 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
   },
 
   resetReports: () => {
-    const { filter, timeRange } = get();
-    const filtered = applyFilters(DUMMY_REPORTS, filter, timeRange);
-    set({ reports: DUMMY_REPORTS, filteredReports: filtered, selectedReport: null });
+    // Reset ke array kosong — data akan di-fetch ulang dari TiDB Cloud
+    set({ reports: [], filteredReports: [], selectedReport: null });
   },
 
   openPanel: () => set({ isPanelOpen: true }),
