@@ -10,9 +10,6 @@ export default defineConfig({
         }),
         react(),
     ],
-    esbuild: {
-        drop: ['debugger'],
-    },
     build: {
         rollupOptions: {
             output: {
@@ -47,7 +44,7 @@ export default defineConfig({
             },
         },
         chunkSizeWarningLimit: 600,
-        minify: 'esbuild',
+        minify: true,
     },
     optimizeDeps: {
         include: [
