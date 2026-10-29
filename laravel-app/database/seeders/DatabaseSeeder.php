@@ -31,7 +31,10 @@ class DatabaseSeeder extends Seeder
 
         $this->command->info("🌱 Memulai seeding database Peta Suara Kota...");
 
-        // 1. Insert / Update Categories
+        // 1. Kelurahan lengkap 154+ via dedicated seeder
+        $this->call(KelurahanLengkapSeeder::class);
+
+        // 1b. Categories
         $createdCategories = [];
         foreach ($categoriesData as $c) {
             $createdCategories[$c['type']] = Category::updateOrCreate(
@@ -46,20 +49,9 @@ class DatabaseSeeder extends Seeder
         }
         $this->command->info("✅ Berhasil memproses " . count($createdCategories) . " kategori laporan.");
 
-        // 2. Insert / Update Kelurahans
-        $createdKelurahans = [];
-        foreach ($kelurahansData as $k) {
-            $kelurahan = Kelurahan::updateOrCreate(
-                ['name' => $k['name'], 'kecamatan' => $k['kecamatan']],
-                [
-                    'kota' => $k['kota'] ?? 'Surabaya',
-                    'centroid_lat' => $k['centroidLat'] ?? null,
-                    'centroid_lng' => $k['centroidLng'] ?? null,
-                ]
-            );
-            $createdKelurahans[] = $kelurahan;
-        }
-        $this->command->info("✅ Berhasil memproses " . count($createdKelurahans) . " kelurahan/kecamatan Surabaya.");
+        // 2. Ambil semua kelurahan dari database (sudah lengkap 154+)
+        $createdKelurahans = Kelurahan::all()->all();
+        $this->command->info("✅ Berhasil memuat " . count($createdKelurahans) . " kelurahan dari database.");
 
         // 3. Insert / Update Users Demo
         $hashedPassword = Hash::make('password123');
