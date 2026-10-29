@@ -35,6 +35,10 @@
       "dest": "/public/robots.txt"
     },
     {
+      "src": "/(.*\\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot))",
+      "dest": "/public/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/index.php"
     }
