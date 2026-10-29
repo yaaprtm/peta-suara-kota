@@ -23,7 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'role' => \App\Http\Middleware\EnsureUserHasRole::class,
+            'role'      => \App\Http\Middleware\EnsureUserHasRole::class,
+            'token.auth' => \App\Http\Middleware\AuthenticateWithToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

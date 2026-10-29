@@ -24,25 +24,19 @@ Route::middleware(['web'])->group(function () {
         
         // Export requires ADMIN or SUPERADMIN
         Route::get('export', [ReportController::class, 'export'])
-            ->middleware(['auth', 'role:ADMIN,SUPERADMIN']);
-        
+            ->middleware(['token.auth', 'role:ADMIN,SUPERADMIN']);
+
         Route::get('track/{code}', [ReportController::class, 'track']);
         Route::post('{id}/upvote', [ReportController::class, 'upvote']);
         Route::get('/', [ReportController::class, 'index']);
         Route::get('{id}', [ReportController::class, 'show']);
 
         // Protected report actions
-        Route::middleware(['auth'])->group(function () {
+        Route::middleware(['token.auth'])->group(function () {
             Route::post('/', [ReportController::class, 'store'])->middleware('throttle:10,1');
-            
-            // Get valid status transitions
             Route::get('{id}/status/transitions', [ReportController::class, 'getValidTransitions']);
-            
-            // Only PETUGAS, ADMIN, SUPERADMIN can update status
             Route::patch('{id}/status', [ReportController::class, 'updateStatus'])
                 ->middleware('role:PETUGAS,ADMIN,SUPERADMIN');
-            
-            // Owner, ADMIN, SUPERADMIN can delete
             Route::delete('{id}', [ReportController::class, 'destroy']);
         });
     });
@@ -62,7 +56,7 @@ Route::middleware(['web'])->group(function () {
     });
 
     // User management endpoints (ADMIN/SUPERADMIN only)
-    Route::middleware(['auth', 'role:ADMIN,SUPERADMIN'])->prefix('users')->group(function () {
+    Route::middleware(['token.auth', 'role:ADMIN,SUPERADMIN'])->prefix('users')->group(function () {
         Route::get('/', [UserController::class, 'index']);
         Route::patch('{id}/role', [UserController::class, 'updateRole']);
         Route::patch('{id}/toggle-active', [UserController::class, 'toggleActive']);

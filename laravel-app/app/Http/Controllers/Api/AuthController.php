@@ -7,50 +7,87 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    // ── Helper: buat token, simpan ke DB, return plaintext ──────────────────
+    private function createToken(User $user, string $name = 'auth-token'): string
+    {
+        $plaintext  = bin2hex(random_bytes(32)); // 64-char hex
+        $hashed     = hash('sha256', $plaintext);
+
+        // Hapus token lama milik user ini agar tidak menumpuk
+        DB::table('personal_access_tokens')
+            ->where('tokenable_type', User::class)
+            ->where('tokenable_id', $user->id)
+            ->delete();
+
+        DB::table('personal_access_tokens')->insert([
+            'tokenable_type' => User::class,
+            'tokenable_id'   => $user->id,
+            'name'           => $name,
+            'token'          => $hashed,
+            'abilities'      => '["*"]',
+            'last_used_at'   => null,
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+
+        return $plaintext;
+    }
+
+    // ── Helper: format user response ─────────────────────────────────────────
+    private function userArray(User $user): array
+    {
+        return [
+            'id'          => $user->id,
+            'email'       => $user->email,
+            'name'        => $user->name,
+            'role'        => $user->role,
+            'phone'       => $user->phone,
+            'avatar'      => $user->avatar,
+            'kelurahan'   => $user->kelurahan ? [
+                'id'         => $user->kelurahan->id,
+                'name'       => $user->kelurahan->name,
+                'kecamatan'  => $user->kelurahan->kecamatan,
+                'kota'       => $user->kelurahan->kota ?? 'Surabaya',
+            ] : null,
+        ];
+    }
+
     /**
      * POST /api/auth/register
      */
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:6'],
-            'name' => ['required', 'string', 'min:2', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'email'       => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'password'    => ['required', 'string', 'min:6'],
+            'name'        => ['required', 'string', 'min:2', 'max:255'],
+            'phone'       => ['nullable', 'string', 'max:50'],
             'kelurahanId' => ['nullable', 'string', 'exists:kelurahans,id'],
         ]);
 
         $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'phone' => $validated['phone'] ?? null,
+            'name'         => $validated['name'],
+            'email'        => $validated['email'],
+            'password'     => Hash::make($validated['password']),
+            'phone'        => $validated['phone'] ?? null,
             'kelurahan_id' => $validated['kelurahanId'] ?? null,
-            'role' => 'WARGA',
-            'is_active' => true,
+            'role'         => 'WARGA',
+            'is_active'    => true,
         ]);
 
-        Auth::login($user);
-        $request->session()->regenerate();
-        $token = bin2hex(random_bytes(32));
+        $user->load('kelurahan');
+        $token = $this->createToken($user, 'register');
 
         return response()->json([
-            'message' => 'Registrasi berhasil',
-            'accessToken' => $token,
+            'message'      => 'Registrasi berhasil',
+            'accessToken'  => $token,
             'refreshToken' => $token,
-            'user' => [
-                'id' => $user->id,
-                'email' => $user->email,
-                'name' => $user->name,
-                'role' => $user->role,
-                'phone' => $user->phone,
-                'kelurahanId' => $user->kelurahan_id,
-            ],
+            'user'         => $this->userArray($user),
         ], 201);
     }
 
@@ -60,37 +97,27 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email' => ['required', 'string', 'email'],
+            'email'    => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
         ]);
 
         $user = User::with('kelurahan')->where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password) || !$user->is_active) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Email atau password salah'], 401);
         }
 
-        Auth::login($user);
-        $request->session()->regenerate();
-        $token = bin2hex(random_bytes(32));
+        if (!$user->is_active) {
+            return response()->json(['message' => 'Akun Anda telah dinonaktifkan.'], 403);
+        }
+
+        $token = $this->createToken($user, 'login');
 
         return response()->json([
-            'message' => 'Login berhasil',
-            'accessToken' => $token,
+            'message'      => 'Login berhasil',
+            'accessToken'  => $token,
             'refreshToken' => $token,
-            'user' => [
-                'id' => $user->id,
-                'email' => $user->email,
-                'name' => $user->name,
-                'role' => $user->role,
-                'phone' => $user->phone,
-                'avatar' => $user->avatar,
-                'kelurahan' => $user->kelurahan ? [
-                    'id' => $user->kelurahan->id,
-                    'name' => $user->kelurahan->name,
-                    'kecamatan' => $user->kelurahan->kecamatan,
-                ] : null,
-            ],
+            'user'         => $this->userArray($user),
         ]);
     }
 
@@ -99,9 +126,13 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        // Hapus token dari DB
+        $bearerToken = $request->bearerToken();
+        if ($bearerToken) {
+            DB::table('personal_access_tokens')
+                ->where('token', hash('sha256', $bearerToken))
+                ->delete();
+        }
 
         return response()->json(['message' => 'Logout berhasil']);
     }
@@ -118,20 +149,6 @@ class AuthController extends Controller
 
         $user->load('kelurahan');
 
-        return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'email' => $user->email,
-                'name' => $user->name,
-                'role' => $user->role,
-                'phone' => $user->phone,
-                'avatar' => $user->avatar,
-                'kelurahan' => $user->kelurahan ? [
-                    'id' => $user->kelurahan->id,
-                    'name' => $user->kelurahan->name,
-                    'kecamatan' => $user->kelurahan->kecamatan,
-                ] : null,
-            ],
-        ]);
+        return response()->json(['user' => $this->userArray($user)]);
     }
 }

@@ -66,20 +66,9 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem('refreshToken', data.refreshToken);
           set({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken, isLoading: false });
           return data.user;
-        } catch {
-          // Fallback to demo account if offline or demo email is used
-          const lowerEmail = email.toLowerCase();
-          let demoUser = DEMO_ACCOUNTS.WARGA;
-          if (lowerEmail.includes('petugas') || lowerEmail.includes('pu')) {
-            demoUser = DEMO_ACCOUNTS.PETUGAS;
-          } else if (lowerEmail.includes('admin') || lowerEmail.includes('super')) {
-            demoUser = DEMO_ACCOUNTS.SUPERADMIN;
-          }
-          const mockToken = `mock-token-${Date.now()}`;
-          localStorage.setItem('accessToken', mockToken);
-          localStorage.setItem('refreshToken', mockToken);
-          set({ user: demoUser, accessToken: mockToken, refreshToken: mockToken, isLoading: false });
-          return demoUser;
+        } catch (err) {
+          set({ isLoading: false, error: 'Login gagal' });
+          throw err; // biarkan Login.tsx handle error-nya
         }
       },
 
@@ -103,19 +92,9 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem('accessToken', res.accessToken);
           localStorage.setItem('refreshToken', res.refreshToken);
           set({ user: res.user, accessToken: res.accessToken, refreshToken: res.refreshToken, isLoading: false });
-        } catch {
-          // If offline, create local session
-          const mockUser: User = {
-            id: `user-${Date.now()}`,
-            name: data.name,
-            email: data.email,
-            role: 'WARGA',
-            phone: data.phone,
-          };
-          const mockToken = `mock-token-${Date.now()}`;
-          localStorage.setItem('accessToken', mockToken);
-          localStorage.setItem('refreshToken', mockToken);
-          set({ user: mockUser, accessToken: mockToken, refreshToken: mockToken, isLoading: false });
+        } catch (err) {
+          set({ isLoading: false, error: 'Registrasi gagal' });
+          throw err;
         }
       },
 

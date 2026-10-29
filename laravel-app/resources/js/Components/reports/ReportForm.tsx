@@ -14,6 +14,7 @@ import {
   IconFileText,
   IconX,
   IconBuildingCommunity,
+  IconCurrentLocation,
 } from '@tabler/icons-react';
 import { useDropzone } from 'react-dropzone';
 import clsx from 'clsx';
@@ -80,8 +81,63 @@ const ReportForm: React.FC<ReportFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<'form' | 'success'>('form');
 
-  // Active coordinates
-  const activeLocation = pickedLocation || initialLocation || { lat: selectedDistrict.lat, lng: selectedDistrict.lng };
+  // GPS state
+  const [isGettingGPS, setIsGettingGPS] = useState(false);
+  const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+
+  // Active coordinates — GPS > picked from map > initial > district center
+  const activeLocation = gpsLocation || pickedLocation || initialLocation || { lat: selectedDistrict.lat, lng: selectedDistrict.lng };
+
+  // Handler GPS
+  const handleGetGPS = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error('Browser Anda tidak mendukung GPS.');
+      return;
+    }
+    setIsGettingGPS(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = Math.round(pos.coords.accuracy);
+        // Validasi apakah dalam batas Surabaya
+        try {
+          const geojson = await fetchKecamatanGeoJSON();
+          const match = findKecamatanByCoordinate(lng, lat, geojson);
+          if (!match) {
+            toast.error('Lokasi GPS Anda berada di luar wilayah Surabaya.');
+            setIsGettingGPS(false);
+            return;
+          }
+          setGpsLocation({ lat, lng });
+          setGpsAccuracy(accuracy);
+          // Auto pilih kecamatan sesuai GPS
+          const found = SURABAYA_DISTRICTS.find(
+            (d) => d.name.toLowerCase() === match.name.toLowerCase()
+          );
+          if (found) setSelectedDistrict(found);
+          toast.success(`📍 Lokasi GPS ditemukan (akurasi ±${accuracy}m)`);
+        } catch {
+          setGpsLocation({ lat, lng });
+          setGpsAccuracy(accuracy);
+          toast.success(`📍 Lokasi GPS ditemukan (akurasi ±${accuracy}m)`);
+        }
+        setIsGettingGPS(false);
+      },
+      (err) => {
+        setIsGettingGPS(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          toast.error('Akses lokasi ditolak. Izinkan lokasi di browser untuk fitur ini.');
+        } else if (err.code === err.TIMEOUT) {
+          toast.error('GPS timeout. Coba lagi atau pilih lokasi di peta.');
+        } else {
+          toast.error('Gagal mendapatkan lokasi GPS.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }, []);
 
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -171,61 +227,21 @@ const ReportForm: React.FC<ReportFormProps> = ({
       formData.append('kecamatan', kecName);
       if (address) formData.append('address', address.trim());
       if (audioTranscript) formData.append('audioTranscript', audioTranscript);
-
       photos.forEach((photo) => {
         formData.append('photos', photo);
       });
 
-      try {
-        const res = (await reportsApi.create(formData)) as any;
-        if (res?.report) {
-          addReport(res.report);
-        }
-      } catch {
-        // Fallback local report creation
-        addReport({
-          id: `rep-warga-${Date.now()}`,
-          title: title.trim(),
-          description: description.trim(),
-          category,
-          status: 'BARU',
-          latitude: activeLocation.lat,
-          longitude: activeLocation.lng,
-          address: address.trim() || `Jl. Protokol, Kec. ${kecName}`,
-          kecamatan: kecName,
-          kelurahan: {
-            id: `kel-${kecName.toLowerCase()}`,
-            name: kecName,
-            kecamatan: kecName,
-          },
-          skorUrgensi: category === 'BANJIR' ? 85 : category === 'KEAMANAN' ? 75 : 55,
-          urgensiKeywords: ['laporan baru', 'warga', kecName.toLowerCase()],
-          photos: photos.map((p) => URL.createObjectURL(p)),
-          audioTranscript: audioTranscript || undefined,
-          userId: user?.id || 'warga-1',
-          user: {
-            id: user?.id || 'warga-1',
-            name: user?.name || 'Warga Surabaya',
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          statusLogs: [
-            {
-              id: `log-${Date.now()}`,
-              reportId: `rep-warga-${Date.now()}`,
-              toStatus: 'BARU',
-              note: 'Laporan berhasil dibuat dan masuk antrean sistem.',
-              changedAt: new Date().toISOString(),
-              changedBy: { id: user?.id || 'warga-1', name: user?.name || 'Warga Pelapor', role: 'WARGA' },
-            },
-          ],
-        });
+      // Kirim ke backend — jika gagal, lempar error ke user (jangan swallow)
+      const res = (await reportsApi.create(formData)) as any;
+      if (res?.report) {
+        addReport(res.report);
       }
 
       setStep('success');
       toast.success(t('reportForm.toastSuccess'));
     } catch (err: any) {
-      toast.error(err?.message || t('reportForm.toastFailed'));
+      const msg = err?.message || t('reportForm.toastFailed');
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -326,8 +342,21 @@ const ReportForm: React.FC<ReportFormProps> = ({
             <span>Lat: {activeLocation.lat.toFixed(4)}, Lng: {activeLocation.lng.toFixed(4)}</span>
             <IconMapPin className="w-3.5 h-3.5 text-orange shrink-0" />
           </div>
+          <button type="button" onClick={handleGetGPS} disabled={isGettingGPS}
+            className={clsx('w-full flex items-center justify-center gap-2 py-2 rounded-lg border text-xs font-semibold transition-all mt-1.5',
+              gpsLocation ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-navy/5 border-navy/20 text-navy hover:bg-navy/10'
+            )}>
+            {isGettingGPS ? <><IconLoader2 className="w-3.5 h-3.5 animate-spin"/>Mendapatkan GPS…</>
+              : gpsLocation ? <><IconCurrentLocation className="w-3.5 h-3.5"/>GPS Aktif ✓ ±{gpsAccuracy}m</>
+              : <><IconCurrentLocation className="w-3.5 h-3.5"/>Gunakan Lokasi Saya (GPS)</>}
+          </button>
+          {onPickLocation && (
+            <button type="button" onClick={onPickLocation}
+              className="w-full text-[11px] text-navy font-semibold underline text-center hover:text-orange mt-1">
+              Atau pilih titik di peta →
+            </button>
+          )}
         </div>
-      </div>
 
       {/* Step 4: Description + Voice */}
       <div>
