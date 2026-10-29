@@ -1,68 +1,91 @@
-import React from 'react';
+import React, { useState } from 'react';
 import clsx from 'clsx';
 
 /**
  * PatrolLogo — Logo + nama brand PATROL
  *
- * Layout referensi: [IMG | PATROL]
- *                         SUARA KOTA SURABAYA
+ * Layout: [🖼 logo | PATROL        ]
+ *                   [SUARA KOTA SURABAYA]
  *
- * Mirip dengan Kebun Raya Cibinong: logo di kiri, dua baris teks di kanan.
+ * Referensi tata letak: Kebun Raya Cibinong
+ * (logo di kiri, nama + subtitle di kanan dalam dua baris)
  */
 
 interface PatrolLogoProps {
-  /** Ukuran logo gambar dalam px (default 36) */
+  /** Tinggi logo dalam px — lebar menyesuaikan aspect ratio (default 40) */
   size?: number;
   /** Tambahan className pada wrapper */
   className?: string;
-  /** Varian warna teks: 'dark' (default), 'light' (untuk bg gelap), 'navy' */
-  variant?: 'dark' | 'light' | 'navy';
+  /** Varian warna teks */
+  variant?: 'dark' | 'light' | 'navy' | 'white-on-dark';
   /** Sembunyikan subtitle (baris kedua) */
   hideSubtitle?: boolean;
 }
 
 export const PatrolLogo: React.FC<PatrolLogoProps> = ({
-  size = 36,
+  size = 40,
   className = '',
   variant = 'dark',
   hideSubtitle = false,
 }) => {
-  const textColor = {
-    dark:  { name: 'text-[#1E1B16]', sub: 'text-[#6B6355]' },
-    light: { name: 'text-white',     sub: 'text-white/70'   },
-    navy:  { name: 'text-navy',      sub: 'text-navy/60'    },
+  const [imgError, setImgError] = useState(false);
+
+  const colors = {
+    dark:          { name: 'text-[#1E1B16]',  sub: 'text-[#7A6E5F]' },
+    light:         { name: 'text-white',        sub: 'text-white/65'  },
+    navy:          { name: 'text-[#1E3A5F]',   sub: 'text-[#1E3A5F]/60' },
+    'white-on-dark': { name: 'text-white',     sub: 'text-white/60'  },
   }[variant];
 
+  const nameFontSize  = Math.round(size * 0.42);
+  const subFontSize   = Math.round(size * 0.22);
+  const dividerHeight = Math.round(size * 0.55);
+
   return (
-    <div className={clsx('flex items-center gap-2.5 select-none', className)}>
-      {/* Logo image */}
-      <img
-        src="/patrol-logo.png"
-        alt="PATROL logo"
-        width={size}
-        height={size}
-        className="shrink-0 object-contain"
-        draggable={false}
+    <div className={clsx('inline-flex items-center gap-0 select-none', className)}>
+
+      {/* ── Logo image ── */}
+      {!imgError ? (
+        <img
+          src="/patrol-logo.png"
+          alt="PATROL"
+          height={size}
+          style={{ height: size, width: 'auto', maxWidth: size * 1.8 }}
+          className="shrink-0 object-contain"
+          draggable={false}
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        /* Fallback: ikon sederhana jika gambar gagal load */
+        <div
+          className="shrink-0 rounded flex items-center justify-center bg-navy text-white font-bold"
+          style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
+        >
+          P
+        </div>
+      )}
+
+      {/* ── Divider tipis ── */}
+      <div
+        className={clsx(
+          'mx-2.5 w-px shrink-0 opacity-30',
+          variant === 'dark' ? 'bg-[#1E1B16]' : 'bg-white'
+        )}
+        style={{ height: dividerHeight }}
       />
 
-      {/* Text stack — persis seperti Kebun Raya Cibinong */}
-      <div className="flex flex-col justify-center leading-none min-w-0">
+      {/* ── Text stack ── */}
+      <div className="flex flex-col justify-center leading-none">
         <span
-          className={clsx(
-            'font-bold tracking-widest uppercase',
-            textColor.name
-          )}
-          style={{ fontSize: Math.round(size * 0.45) }}
+          className={clsx('font-black tracking-[0.18em] uppercase whitespace-nowrap', colors.name)}
+          style={{ fontSize: nameFontSize, lineHeight: 1.1 }}
         >
           PATROL
         </span>
         {!hideSubtitle && (
           <span
-            className={clsx(
-              'font-medium uppercase tracking-wider',
-              textColor.sub
-            )}
-            style={{ fontSize: Math.round(size * 0.24) }}
+            className={clsx('font-semibold uppercase tracking-[0.12em] whitespace-nowrap mt-0.5', colors.sub)}
+            style={{ fontSize: subFontSize, lineHeight: 1.1 }}
           >
             Suara Kota Surabaya
           </span>
@@ -72,11 +95,9 @@ export const PatrolLogo: React.FC<PatrolLogoProps> = ({
   );
 };
 
-/**
- * Versi compact — hanya untuk header yang sangat sempit (tanpa subtitle)
- */
-export const PatrolLogoCompact: React.FC<{ size?: number; className?: string; variant?: PatrolLogoProps['variant'] }> = (props) => (
-  <PatrolLogo {...props} hideSubtitle />
-);
+/** Versi tanpa subtitle — untuk ruang sempit */
+export const PatrolLogoCompact: React.FC<
+  Pick<PatrolLogoProps, 'size' | 'className' | 'variant'>
+> = (props) => <PatrolLogo {...props} hideSubtitle />;
 
 export default PatrolLogo;
