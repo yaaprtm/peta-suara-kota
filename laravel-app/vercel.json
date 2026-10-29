@@ -3,7 +3,7 @@
   "framework": null,
   "outputDirectory": "public",
   "buildCommand": "npm run vercel-build",
-  "installCommand": "npm install --ignore-scripts",
+  "installCommand": "npm install --ignore-scripts --legacy-peer-deps",
   "functions": {
     "api/index.php": {
       "runtime": "vercel-php@0.7.4"
