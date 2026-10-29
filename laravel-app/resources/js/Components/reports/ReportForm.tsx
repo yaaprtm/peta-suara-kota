@@ -357,6 +357,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
             </button>
           )}
         </div>
+      </div>
 
       {/* Step 4: Description + Voice */}
       <div>
