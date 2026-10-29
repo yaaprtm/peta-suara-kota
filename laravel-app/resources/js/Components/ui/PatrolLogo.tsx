@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import clsx from 'clsx';
-// Import gambar langsung — Vite akan bundle dan hash filename-nya
-// sehingga tidak bergantung pada routing Vercel
-import patrolLogoSrc from '../../../public/patrol-logo.png';
+// Path relatif dari Components/ui/ ke assets/ = ../../assets/
+import patrolLogoSrc from '../../assets/patrol-logo.png';
 
 /**
  * PatrolLogo — Logo + nama brand PATROL
