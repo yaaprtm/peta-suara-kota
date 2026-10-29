@@ -1,10 +1,10 @@
-// ─── Bahasa Indonesia ─────────────────────────────────────────────────────────
+  // ─── Bahasa Indonesia ─────────────────────────────────────────────────────────
 
 const id = {
   // ── Common / Shared ──────────────────────────────────────────────────────────
   common: {
-    appName: 'Peta Suara Kota',
-    appSubtitle: 'KOTAMADYA SURABAYA',
+    appName: 'PATROL',
+    appSubtitle: 'SUARA KOTA SURABAYA',
     back: 'Kembali',
     backToHome: 'Kembali ke Beranda Publik',
     loading: 'Memuat...',
@@ -166,7 +166,7 @@ const id = {
 
   // ── Map Page ──────────────────────────────────────────────────────────────────
   map: {
-    wordmark: 'Peta Suara Kota',
+    wordmark: 'PATROL',
     surabayaTag: 'SURABAYA',
     reportCta: 'Lapor, Rek!',
     reportCtaShort: 'Lapor',

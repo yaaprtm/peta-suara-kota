@@ -23,6 +23,7 @@ import { OverviewStats, User } from '@/types';
 import toast from 'react-hot-toast';
 import { useTranslation } from '@/i18n/useTranslation';
 import LanguageToggle from '@/Components/ui/LanguageToggle';
+import PatrolLogo from '@/Components/ui/PatrolLogo';
 
 // ─── KPI Skeleton ──────────────────────────────────────────────────────────────
 const KpiSkeleton: React.FC = () => (
@@ -90,17 +91,7 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           {/* Brand */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-navy flex items-center justify-center text-white shadow-sm">
-              <IconBuildingCommunity className="w-5 h-5 text-orange" />
-            </div>
-            <div>
-              <span className="font-bold text-navy text-base tracking-tight leading-none block">
-                {t('common.appName')}
-              </span>
-              <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block mt-0.5">
-                {t('common.appSubtitle')}
-              </span>
-            </div>
+            <PatrolLogo size={38} variant="navy" className="shrink-0" />
           </div>
 
           {/* Desktop nav links */}
@@ -481,8 +472,8 @@ const LandingPage: React.FC = () => {
       <footer className="bg-navy text-white py-8 px-4 mt-auto">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-300">
           <div className="flex items-center gap-2">
-            <IconBuildingCommunity className="w-5 h-5 text-orange" />
-            <span className="font-bold text-white">{t('common.appName')} Surabaya</span>
+            <img src="/patrol-logo.png" alt="PATROL" className="w-5 h-5 object-contain opacity-80" />
+            <span className="font-bold text-white">PATROL Surabaya</span>
             <span className="text-slate-500">·</span>
             <span>{t('landing.footerWorkshop')}</span>
           </div>
