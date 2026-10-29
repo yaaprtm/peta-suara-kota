@@ -25,7 +25,7 @@ const RegisterPage: React.FC = () => {
     try {
       await register({ name: form.name, email: form.email, password: form.password, phone: form.phone || undefined });
       toast.success(t('auth.registerSuccess'));
-      navigate('/dashboard');
+      window.location.href = '/dashboard';
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t('auth.registerFailed');
       toast.error(msg);

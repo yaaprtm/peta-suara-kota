@@ -28,13 +28,13 @@ const LoginPage: React.FC = () => {
       const params = new URLSearchParams(window.location.search);
       const redirect = params.get('redirect');
       if (redirect) {
-        navigate(redirect);
+        window.location.href = redirect;
         return;
       }
     }
-    if (role === 'PETUGAS') navigate('/petugas');
-    else if (role === 'SUPERADMIN' || role === 'ADMIN') navigate('/superadmin');
-    else navigate('/dashboard');
+    if (role === 'PETUGAS') window.location.href = '/petugas';
+    else if (role === 'SUPERADMIN' || role === 'ADMIN') window.location.href = '/superadmin';
+    else window.location.href = '/dashboard';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
