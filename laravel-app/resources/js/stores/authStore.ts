@@ -62,13 +62,14 @@ export const useAuthStore = create<AuthState>()(
             accessToken: string;
             refreshToken: string;
           };
+          // Simpan token di SEMUA tempat secara eksplisit
           localStorage.setItem('accessToken', data.accessToken);
           localStorage.setItem('refreshToken', data.refreshToken);
           set({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken, isLoading: false });
           return data.user;
         } catch (err) {
           set({ isLoading: false, error: 'Login gagal' });
-          throw err; // biarkan Login.tsx handle error-nya
+          throw err;
         }
       },
 
@@ -118,6 +119,21 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-store',
       partialize: (state) => ({ user: state.user, accessToken: state.accessToken, refreshToken: state.refreshToken }),
+      onRehydrateStorage: () => (state) => {
+        // Jika ada user tapi tidak ada token — state korup, hapus user
+        if (state?.user && !state?.accessToken) {
+          state.user = null;
+          state.accessToken = null;
+          state.refreshToken = null;
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        }
+        // Sinkronkan token dari Zustand persist ke localStorage key terpisah
+        // agar request() di api.ts bisa membacanya
+        if (state?.accessToken) {
+          localStorage.setItem('accessToken', state.accessToken);
+        }
+      },
     }
   )
 );
