@@ -219,6 +219,23 @@ const ReportForm: React.FC<ReportFormProps> = ({
     setSubmitError(null);
     const kecName = selectedDistrict.name;
 
+    // Validasi ukuran foto sebelum dikirim (batas Vercel ~4,5 MB total)
+    const MAX_PHOTO_MB = 2;
+    for (const photo of photos) {
+      if (photo.size > MAX_PHOTO_MB * 1024 * 1024) {
+        const mb = (photo.size / 1024 / 1024).toFixed(1);
+        const msg = `Foto "${photo.name}" berukuran ${mb} MB. Maksimal ${MAX_PHOTO_MB} MB per foto.`;
+        setSubmitError(msg);
+        toast.error(msg);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // Timeout sisi klien 25 detik
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
+
     try {
       const formData = new FormData();
       formData.append('title', title.trim());
@@ -242,10 +259,14 @@ const ReportForm: React.FC<ReportFormProps> = ({
       setStep('success');
       toast.success(t('reportForm.toastSuccess'));
     } catch (err: any) {
-      const msg = err?.message || t('reportForm.toastFailed');
+      const isAbort = err?.name === 'AbortError' || String(err?.message).includes('abort');
+      const msg = isAbort
+        ? 'Pengiriman melebihi batas waktu. Periksa koneksi internet Anda lalu coba lagi.'
+        : (err?.message || t('reportForm.toastFailed'));
       setSubmitError(msg);
       toast.error(msg);
     } finally {
+      clearTimeout(timeout);
       setIsSubmitting(false);
     }
   };

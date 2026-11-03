@@ -62,8 +62,25 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: `HTTP ${res.status}` }));
-    throw new Error(err.message || `Request failed: ${res.status}`);
+    const body = await res.json().catch(() => ({ message: '' })) as { message?: string; errors?: Record<string, string[]> };
+    // Pesan ramah per kode HTTP
+    const friendly: Record<number, string> = {
+      400: body.message || 'Data tidak valid. Periksa kembali isian form.',
+      401: 'Sesi Anda telah berakhir. Silakan login kembali.',
+      403: 'Anda tidak memiliki izin untuk melakukan tindakan ini.',
+      413: 'Ukuran file terlalu besar. Maksimal total 4,5 MB.',
+      422: (() => {
+        if (body.errors) {
+          const first = Object.values(body.errors)[0];
+          return Array.isArray(first) ? first[0] : body.message || 'Data tidak valid.';
+        }
+        return body.message || 'Data tidak valid.';
+      })(),
+      429: 'Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.',
+      500: 'Terjadi kesalahan pada server. Coba lagi dalam beberapa saat.',
+      503: 'Server sedang tidak tersedia. Coba lagi dalam beberapa saat.',
+    };
+    throw new Error(friendly[res.status] ?? body.message ?? `Permintaan gagal (${res.status}).`);
   }
 
   return res.json();

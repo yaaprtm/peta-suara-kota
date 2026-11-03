@@ -17,6 +17,7 @@ use App\Services\UrgencyScorer;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -235,17 +236,15 @@ class ReportController extends Controller
         $lat = (float) $request->latitude;
         $lng = (float) $request->longitude;
 
-        // Validate coordinates using GeofenceValidator
+        // Geofence check
         $validation = GeofenceValidator::validate($lat, $lng);
         if (!$validation['valid']) {
-            return response()->json([
-                'message' => $validation['message'],
-            ], 400);
+            return response()->json(['message' => $validation['message']], 400);
         }
 
         $detectedKecamatan = $validation['kecamatan'];
 
-        // Upload media files — tangkap error agar laporan tetap bisa disimpan tanpa foto
+        // Upload foto — kegagalan tidak memblok pembuatan laporan
         $photoPaths = [];
         if ($request->hasFile('photos')) {
             try {
@@ -255,8 +254,7 @@ class ReportController extends Controller
                     'public'
                 );
             } catch (\Throwable $e) {
-                // Log error tapi lanjutkan tanpa foto
-                \Log::warning('Photo upload failed: ' . $e->getMessage());
+                error_log('Photo upload failed: ' . $e->getMessage());
             }
         }
 
@@ -269,50 +267,75 @@ class ReportController extends Controller
                     'public'
                 );
             } catch (\Throwable $e) {
-                \Log::warning('Audio upload failed: ' . $e->getMessage());
+                error_log('Audio upload failed: ' . $e->getMessage());
             }
         }
 
         // Urgency scoring
-        $textToAnalyze = trim($request->title . ' ' . $request->description . ' ' . ($request->audioTranscript ?? ''));
-        $urgency = UrgencyScorer::analyzeUrgency($textToAnalyze, $request->category);
-
+        $textToAnalyze = trim(
+            $request->title . ' ' .
+            $request->description . ' ' .
+            ($request->audioTranscript ?? '')
+        );
+        $urgency     = UrgencyScorer::analyzeUrgency($textToAnalyze, $request->category);
         $categoryRef = Category::where('type', $request->category)->first();
 
-        $report = Report::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'category' => $request->category,
-            'status' => 'BARU',
-            'latitude' => $lat,
-            'longitude' => $lng,
-            'address' => $request->address,
-            'kelurahan_id' => $request->kelurahanId,
-            'kecamatan' => $detectedKecamatan,
-            'skor_urgensi' => $urgency['skorUrgensi'],
-            'urgensi_keywords' => $urgency['urgensiKeywords'],
-            'photos' => $photoPaths,
-            'audio_url' => $audioPath,
-            'audio_transcript' => $request->audioTranscript,
-            'user_id' => $request->user()->id,
-            'category_id' => $categoryRef?->id,
-        ]);
+        // Bungkus pembuatan report + status_log dalam satu transaksi
+        // agar tidak ada data setengah tersimpan bila salah satu langkah gagal
+        try {
+            $report = \Illuminate\Support\Facades\DB::transaction(function () use (
+                $request, $lat, $lng, $detectedKecamatan,
+                $urgency, $categoryRef, $photoPaths, $audioPath
+            ) {
+                $report = Report::create([
+                    'title'            => $request->title,
+                    'description'      => $request->description,
+                    'category'         => $request->category,
+                    'status'           => 'BARU',
+                    'latitude'         => $lat,
+                    'longitude'        => $lng,
+                    'address'          => $request->address,
+                    'kelurahan_id'     => $request->kelurahanId,
+                    'kecamatan'        => $detectedKecamatan,
+                    'skor_urgensi'     => $urgency['skorUrgensi'],
+                    'urgensi_keywords' => $urgency['urgensiKeywords'],
+                    'photos'           => $photoPaths,
+                    'audio_url'        => $audioPath,
+                    'audio_transcript' => $request->audioTranscript,
+                    'user_id'          => $request->user()->id,
+                    'category_id'      => $categoryRef?->id,
+                ]);
 
-        // Status log awal
-        StatusLog::create([
-            'report_id' => $report->id,
-            'from_status' => null,
-            'to_status' => 'BARU',
-            'note' => 'Laporan diterima oleh sistem',
-            'changed_by_id' => $request->user()->id,
-            'changed_at' => now(),
-        ]);
+                StatusLog::create([
+                    'report_id'      => $report->id,
+                    'from_status'    => null,
+                    'to_status'      => 'BARU',
+                    'note'           => 'Laporan diterima oleh sistem',
+                    'changed_by_id'  => $request->user()->id,
+                    'changed_at'     => now(),
+                ]);
+
+                return $report;
+            });
+        } catch (\Throwable $e) {
+            $requestId = substr(md5(uniqid('', true)), 0, 12);
+            error_log(json_encode([
+                'request_id' => $requestId,
+                'exception'  => get_class($e),
+                'message'    => $e->getMessage(),
+                'file'       => basename($e->getFile()) . ':' . $e->getLine(),
+            ]));
+            return response()->json([
+                'message'    => 'Laporan gagal disimpan. Coba lagi dalam beberapa saat.',
+                'request_id' => $requestId,
+            ], 500);
+        }
 
         $report->load(['user', 'kelurahan']);
 
         return response()->json([
             'message' => 'Laporan berhasil dibuat',
-            'report' => new ReportResource($report),
+            'report'  => new ReportResource($report),
         ], 201);
     }
 

@@ -31,7 +31,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
-        $exceptions->respond(function ($response, Throwable $e) {
+
+        $exceptions->respond(function ($response, Throwable $e, Request $request) {
+            // Biarkan Laravel menangani sendiri exception yang sudah punya format JSON
             if ($e instanceof \Illuminate\Auth\AuthenticationException
                 || $e instanceof \Illuminate\Auth\Access\AuthorizationException
                 || $e instanceof \Illuminate\Validation\ValidationException
@@ -39,15 +41,26 @@ return Application::configure(basePath: dirname(__DIR__))
                 return $response;
             }
 
-            if (request()->has('debug')) {
-                return response(
-                    "ERROR: " . $e->getMessage() . "\n" .
-                    "FILE: " . $e->getFile() . ":" . $e->getLine() . "\n\n" .
-                    $e->getTraceAsString(),
-                    500,
-                    ['Content-Type' => 'text/plain']
-                );
+            // Untuk route api/*, kembalikan JSON seragam dengan request_id
+            if ($request->is('api/*') || $request->expectsJson()) {
+                $requestId = substr(md5(uniqid('', true)), 0, 12);
+
+                // Log terstruktur ke stderr (tidak memuat data pribadi)
+                error_log(json_encode([
+                    'request_id' => $requestId,
+                    'method'     => $request->method(),
+                    'path'       => $request->path(),
+                    'exception'  => get_class($e),
+                    'message'    => $e->getMessage(),
+                    'file'       => basename($e->getFile()) . ':' . $e->getLine(),
+                ]));
+
+                return response()->json([
+                    'message'    => 'Terjadi kesalahan pada server. Coba lagi dalam beberapa saat.',
+                    'request_id' => $requestId,
+                ], 500);
             }
+
             return $response;
         });
     })->create()
