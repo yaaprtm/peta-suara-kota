@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+﻿import React, { useState, useCallback, useRef } from 'react';
 import {
   IconUpload,
   IconMicrophone,
@@ -87,7 +87,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
   const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
 
-  // Active coordinates — GPS > picked from map > initial > district center
+  // Active coordinates â€” GPS > picked from map > initial > district center
   const activeLocation = gpsLocation || pickedLocation || initialLocation || { lat: selectedDistrict.lat, lng: selectedDistrict.lng };
 
   // Handler GPS
@@ -250,7 +250,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
         formData.append('photos', photo);
       });
 
-      // Kirim ke backend — jika gagal, lempar error ke user (jangan swallow)
+      // Kirim ke backend â€” jika gagal, lempar error ke user (jangan swallow)
       const res = (await reportsApi.create(formData)) as any;
       if (res?.report) {
         addReport(res.report);
@@ -370,14 +370,14 @@ const ReportForm: React.FC<ReportFormProps> = ({
             className={clsx('w-full flex items-center justify-center gap-2 py-2 rounded-lg border text-xs font-semibold transition-all mt-1.5',
               gpsLocation ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-navy/5 border-navy/20 text-navy hover:bg-navy/10'
             )}>
-            {isGettingGPS ? <><IconLoader2 className="w-3.5 h-3.5 animate-spin"/>Mendapatkan GPS…</>
-              : gpsLocation ? <><IconCurrentLocation className="w-3.5 h-3.5"/>GPS Aktif ✓ ±{gpsAccuracy}m</>
+            {isGettingGPS ? <><IconLoader2 className="w-3.5 h-3.5 animate-spin"/>Mendapatkan GPSâ€¦</>
+              : gpsLocation ? <><IconCurrentLocation className="w-3.5 h-3.5"/>GPS Aktif âœ“ Â±{gpsAccuracy}m</>
               : <><IconCurrentLocation className="w-3.5 h-3.5"/>Gunakan Lokasi Saya (GPS)</>}
           </button>
           {onPickLocation && (
             <button type="button" onClick={onPickLocation}
               className="w-full text-[11px] text-navy font-semibold underline text-center hover:text-orange mt-1">
-              Atau pilih titik di peta →
+              Atau pilih titik di peta â†’
             </button>
           )}
         </div>
@@ -456,7 +456,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
         )}
       </div>
 
-      {/* Error banner — muncul di dalam modal, tidak tertutup overlay */}
+      {/* Error banner â€” muncul di dalam modal, tidak tertutup overlay */}
       {submitError && (
         <div className="flex items-start gap-2 p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-700">
           <IconX className="w-4 h-4 shrink-0 mt-0.5 text-[#B23327]" />
