@@ -80,6 +80,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
   const [audioTranscript, setAudioTranscript] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<'form' | 'success'>('form');
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // GPS state
   const [isGettingGPS, setIsGettingGPS] = useState(false);
@@ -215,6 +216,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
     }
 
     setIsSubmitting(true);
+    setSubmitError(null);
     const kecName = selectedDistrict.name;
 
     try {
@@ -241,6 +243,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
       toast.success(t('reportForm.toastSuccess'));
     } catch (err: any) {
       const msg = err?.message || t('reportForm.toastFailed');
+      setSubmitError(msg);
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -432,6 +435,14 @@ const ReportForm: React.FC<ReportFormProps> = ({
         )}
       </div>
 
+      {/* Error banner — muncul di dalam modal, tidak tertutup overlay */}
+      {submitError && (
+        <div className="flex items-start gap-2 p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-700">
+          <IconX className="w-4 h-4 shrink-0 mt-0.5 text-[#B23327]" />
+          <span>{submitError}</span>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="pt-2 flex gap-2">
         <button
@@ -443,6 +454,11 @@ const ReportForm: React.FC<ReportFormProps> = ({
             <>
               <IconLoader2 className="w-4 h-4 animate-spin text-orange" />
               <span>{t('reportForm.submitting')}</span>
+            </>
+          ) : submitError ? (
+            <>
+              <IconSend className="w-4 h-4 text-orange" />
+              <span>Coba Lagi</span>
             </>
           ) : (
             <>

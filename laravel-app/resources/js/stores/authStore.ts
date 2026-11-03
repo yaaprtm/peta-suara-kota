@@ -6,7 +6,6 @@ import { authApi } from '../lib/api';
 interface AuthState {
   user: User | null;
   accessToken: string | null;
-  refreshToken: string | null;
   isLoading: boolean;
   error: string | null;
 
@@ -18,39 +17,49 @@ interface AuthState {
   loginAsRole: (role: 'WARGA' | 'PETUGAS' | 'SUPERADMIN') => User;
 }
 
+// Akun demo hanya untuk tombol 1-klik di halaman login.
+// Token yang dibuat di sini (mock-*) tidak akan diterima backend.
 export const DEMO_ACCOUNTS: Record<'WARGA' | 'PETUGAS' | 'SUPERADMIN', User> = {
   WARGA: {
     id: 'user-warga-1',
     name: 'Budi Santoso',
     email: 'warga@surabaya.go.id',
     role: 'WARGA',
-    phone: '081234567890',
     kelurahan: { id: 'kel-gubeng', name: 'Gubeng', kecamatan: 'Gubeng', kota: 'Surabaya' },
   },
   PETUGAS: {
     id: 'user-petugas-1',
-    name: 'Bambang Trianto (Petugas Command Center)',
+    name: 'Bambang Trianto',
     email: 'petugas@surabaya.go.id',
     role: 'PETUGAS',
-    phone: '081234567891',
     kelurahan: { id: 'kel-gubeng', name: 'Gubeng', kecamatan: 'Gubeng', kota: 'Surabaya' },
   },
   SUPERADMIN: {
     id: 'user-admin-1',
-    name: 'Rendra Prasetya (Superadmin Pemkot)',
+    name: 'Rendra Prasetya',
     email: 'superadmin@surabaya.go.id',
     role: 'SUPERADMIN',
-    phone: '081234567892',
     kelurahan: { id: 'kel-genteng', name: 'Genteng', kecamatan: 'Genteng', kota: 'Surabaya' },
   },
 };
+
+// Satu-satunya tempat token disimpan: localStorage['accessToken'].
+// Zustand persist hanya menyimpan 'user' agar UI tetap tampil setelah reload.
+// Saat submit laporan, api.ts membaca localStorage['accessToken'] langsung.
+
+function saveToken(token: string): void {
+  localStorage.setItem('accessToken', token);
+}
+
+function clearToken(): void {
+  localStorage.removeItem('accessToken');
+}
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isLoading: false,
       error: null,
 
@@ -60,12 +69,9 @@ export const useAuthStore = create<AuthState>()(
           const data = await authApi.login(email, password) as {
             user: User;
             accessToken: string;
-            refreshToken: string;
           };
-          // Simpan token di SEMUA tempat secara eksplisit
-          localStorage.setItem('accessToken', data.accessToken);
-          localStorage.setItem('refreshToken', data.refreshToken);
-          set({ user: data.user, accessToken: data.accessToken, refreshToken: data.refreshToken, isLoading: false });
+          saveToken(data.accessToken);
+          set({ user: data.user, accessToken: data.accessToken, isLoading: false });
           return data.user;
         } catch (err) {
           set({ isLoading: false, error: 'Login gagal' });
@@ -76,9 +82,8 @@ export const useAuthStore = create<AuthState>()(
       loginAsRole: (role) => {
         const demoUser = DEMO_ACCOUNTS[role];
         const mockToken = `mock-token-${role.toLowerCase()}-${Date.now()}`;
-        localStorage.setItem('accessToken', mockToken);
-        localStorage.setItem('refreshToken', mockToken);
-        set({ user: demoUser, accessToken: mockToken, refreshToken: mockToken, isLoading: false, error: null });
+        saveToken(mockToken);
+        set({ user: demoUser, accessToken: mockToken, isLoading: false, error: null });
         return demoUser;
       },
 
@@ -88,11 +93,9 @@ export const useAuthStore = create<AuthState>()(
           const res = await authApi.register(data) as {
             user: User;
             accessToken: string;
-            refreshToken: string;
           };
-          localStorage.setItem('accessToken', res.accessToken);
-          localStorage.setItem('refreshToken', res.refreshToken);
-          set({ user: res.user, accessToken: res.accessToken, refreshToken: res.refreshToken, isLoading: false });
+          saveToken(res.accessToken);
+          set({ user: res.user, accessToken: res.accessToken, isLoading: false });
         } catch (err) {
           set({ isLoading: false, error: 'Registrasi gagal' });
           throw err;
@@ -102,15 +105,14 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         const { accessToken } = get();
         try {
-          // FIX: gunakan accessToken (bukan refreshToken) sebagai Bearer untuk logout
-          // karena AuthenticateWithToken middleware membaca Bearer token, bukan refreshToken
-          if (accessToken && !accessToken.startsWith('mock-token')) await authApi.logout(accessToken);
+          if (accessToken && !accessToken.startsWith('mock-token')) {
+            await authApi.logout();
+          }
         } catch {
-          // Abaikan error logout — tetap hapus token lokal
+          // Abaikan error logout sisi server
         }
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        set({ user: null, accessToken: null, refreshToken: null });
+        clearToken();
+        set({ user: null, accessToken: null });
       },
 
       clearError: () => set({ error: null }),
@@ -118,20 +120,20 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-store',
-      partialize: (state) => ({ user: state.user, accessToken: state.accessToken, refreshToken: state.refreshToken }),
+      // Hanya simpan user ke Zustand persist agar nama tampil setelah reload.
+      // Token disimpan di localStorage['accessToken'] secara terpisah via saveToken().
+      partialize: (state) => ({ user: state.user }),
       onRehydrateStorage: () => (state) => {
-        // Jika ada user tapi tidak ada token — state korup, hapus user
-        if (state?.user && !state?.accessToken) {
+        if (!state) return;
+        // Pulihkan accessToken dari localStorage ke state agar komponen
+        // yang membaca store.accessToken tetap konsisten.
+        const storedToken = localStorage.getItem('accessToken');
+        if (storedToken) {
+          state.accessToken = storedToken;
+        } else if (state.user) {
+          // Ada user tapi tidak ada token — state korup, hapus user
           state.user = null;
           state.accessToken = null;
-          state.refreshToken = null;
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-        }
-        // Sinkronkan token dari Zustand persist ke localStorage key terpisah
-        // agar request() di api.ts bisa membacanya
-        if (state?.accessToken) {
-          localStorage.setItem('accessToken', state.accessToken);
         }
       },
     }

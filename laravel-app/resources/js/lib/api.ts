@@ -22,19 +22,9 @@ async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  // Baca token dari localStorage langsung (set oleh authStore.login())
-  // Juga coba baca dari Zustand persist store sebagai fallback
-  let token = localStorage.getItem('accessToken');
-  if (!token) {
-    try {
-      const authStoreRaw = localStorage.getItem('auth-store');
-      if (authStoreRaw) {
-        const authStoreParsed = JSON.parse(authStoreRaw);
-        token = authStoreParsed?.state?.accessToken ?? null;
-      }
-    } catch { /* ignore */ }
-  }
-
+  // Satu-satunya sumber token: localStorage['accessToken']
+  // yang diset oleh authStore.saveToken() saat login/register.
+  const token = localStorage.getItem('accessToken');
   const csrfToken = getCsrfToken();
 
   const headers: Record<string, string> = {
@@ -55,23 +45,20 @@ async function request<T>(
   });
 
   if (res.status === 401) {
-    // Token expired atau invalid — hapus token dan redirect ke login
+    // Token tidak valid atau kedaluwarsa — bersihkan semua sisa auth
     localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    // Hapus dari Zustand persist juga
     try {
       const raw = localStorage.getItem('auth-store');
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed?.state) {
-          parsed.state.accessToken = null;
-          parsed.state.refreshToken = null;
           parsed.state.user = null;
+          parsed.state.accessToken = null;
           localStorage.setItem('auth-store', JSON.stringify(parsed));
         }
       }
-    } catch { /* ignore */ }
-    throw new Error('Session expired. Silakan login kembali.');
+    } catch { /* abaikan */ }
+    throw new Error('Sesi Anda telah berakhir. Silakan login kembali.');
   }
 
   if (!res.ok) {
