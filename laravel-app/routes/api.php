@@ -34,6 +34,7 @@ Route::middleware(['web'])->group(function () {
         // Protected report actions
         Route::middleware(['token.auth'])->group(function () {
             Route::post('/', [ReportController::class, 'store'])->middleware('throttle:10,1');
+            Route::post('{id}/upvote', [ReportController::class, 'upvote'])->middleware('throttle:5,1');
             Route::get('{id}/status/transitions', [ReportController::class, 'getValidTransitions']);
             Route::patch('{id}/status', [ReportController::class, 'updateStatus'])
                 ->middleware('role:PETUGAS,ADMIN,SUPERADMIN');
