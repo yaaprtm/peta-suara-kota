@@ -166,7 +166,7 @@ const id = {
 
   // ── Map Page ──────────────────────────────────────────────────────────────────
   map: {
-    wordmark: 'PATROL',
+    wordmark: 'Peta Suara Kota',
     surabayaTag: 'SURABAYA',
     reportCta: 'Lapor, Rek!',
     reportCtaShort: 'Lapor',
