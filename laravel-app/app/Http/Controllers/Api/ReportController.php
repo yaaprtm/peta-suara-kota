@@ -506,9 +506,10 @@ class ReportController extends Controller
             'statusLogs.changedBy' => fn($q) => $q->select(['id', 'name', 'role']),
             'categoryRef',
         ])
-        ->where('tracking_code', $cleanCode)
-        ->orWhere('id', $cleanCode)
-        ->orWhere('tracking_code', 'LIKE', "%{$cleanCode}%")
+        ->where(function ($q) use ($cleanCode) {
+            $q->where('tracking_code', $cleanCode)
+              ->orWhere('id', $cleanCode);
+        })
         ->first();
 
         if (!$report) {

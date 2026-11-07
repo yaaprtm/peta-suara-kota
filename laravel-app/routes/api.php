@@ -26,7 +26,7 @@ Route::middleware(['web'])->group(function () {
         Route::get('export', [ReportController::class, 'export'])
             ->middleware(['token.auth', 'role:ADMIN,SUPERADMIN']);
 
-        Route::get('track/{code}', [ReportController::class, 'track']);
+        Route::get('track/{code}', [ReportController::class, 'track'])->middleware('throttle:30,1');
         Route::post('{id}/upvote', [ReportController::class, 'upvote']);
         Route::get('/', [ReportController::class, 'index']);
         Route::get('{id}', [ReportController::class, 'show']);
