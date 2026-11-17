@@ -9,6 +9,8 @@ use App\Contracts\Repositories\KelurahanRepositoryInterface;
 use App\Contracts\Repositories\ReportRepositoryInterface;
 use App\Contracts\Repositories\TokenRepositoryInterface;
 use App\Contracts\Repositories\UserRepositoryInterface;
+use App\Repositories\Firestore\FirestoreCounterRepository;
+use App\Repositories\Firestore\FirestoreReportRepository;
 use App\Repositories\Firestore\FirestoreTokenRepository;
 use App\Repositories\Firestore\FirestoreUserRepository;
 use App\Repositories\InMemory\InMemoryCounterRepository;
@@ -46,9 +48,8 @@ class FirebaseServiceProvider extends ServiceProvider
         } else {
             $this->app->singleton(UserRepositoryInterface::class, FirestoreUserRepository::class);
             $this->app->singleton(TokenRepositoryInterface::class, FirestoreTokenRepository::class);
-            // Counter dan Report akan dihubungkan di Tahap berikutnya
-            $this->app->singleton(CounterRepositoryInterface::class, InMemoryCounterRepository::class);
-            $this->app->singleton(ReportRepositoryInterface::class, InMemoryReportRepository::class);
+            $this->app->singleton(CounterRepositoryInterface::class, FirestoreCounterRepository::class);
+            $this->app->singleton(ReportRepositoryInterface::class, FirestoreReportRepository::class);
         }
     }
 

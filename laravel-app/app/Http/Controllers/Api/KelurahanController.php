@@ -2,38 +2,64 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Repositories\CounterRepositoryInterface;
+use App\Contracts\Repositories\KelurahanRepositoryInterface;
 use App\Http\Controllers\Controller;
-use App\Models\Kelurahan;
 use Illuminate\Http\JsonResponse;
 
 class KelurahanController extends Controller
 {
+    protected KelurahanRepositoryInterface $kelurahanRepository;
+    protected CounterRepositoryInterface $counterRepository;
+
+    public function __construct(
+        KelurahanRepositoryInterface $kelurahanRepository,
+        CounterRepositoryInterface $counterRepository
+    ) {
+        $this->kelurahanRepository = $kelurahanRepository;
+        $this->counterRepository = $counterRepository;
+    }
+
     /**
      * GET /api/kelurahans
      */
     public function index(): JsonResponse
     {
-        $kelurahans = Kelurahan::withCount('reports')
-            ->orderBy('kecamatan', 'asc')
-            ->orderBy('name', 'asc')
-            ->get()
-            ->map(function ($k) {
-                return [
-                    'id' => $k->id,
-                    'name' => $k->name,
-                    'kecamatan' => $k->kecamatan,
-                    'kota' => $k->kota,
-                    'centroidLat' => (float) $k->centroid_lat,
-                    'centroidLng' => (float) $k->centroid_lng,
-                    '_count' => [
-                        'reports' => (int) $k->reports_count,
-                    ],
-                ];
-            });
+        // Ambil data laporan per kelurahan dari counter leaderboard (1 read dokumen atau in-memory)
+        $leaderboard = $this->counterRepository->getLeaderboard();
+        $counts = [];
+        foreach ($leaderboard as $item) {
+            $kid = (string) ($item['kelurahan']['id'] ?? '');
+            if ($kid !== '') {
+                $counts[$kid] = (int) ($item['totalReports'] ?? 0);
+            }
+        }
+
+        $all = $this->kelurahanRepository->allWithReportCounts($counts);
+
+        usort($all, function ($a, $b) {
+            $cmpKec = strcmp($a['kecamatan'], $b['kecamatan']);
+            if ($cmpKec !== 0) return $cmpKec;
+            return strcmp($a['name'], $b['name']);
+        });
+
+        $kelurahans = array_map(function ($k) {
+            return [
+                'id' => (string) $k['id'],
+                'name' => $k['name'],
+                'kecamatan' => $k['kecamatan'],
+                'kota' => $k['kota'] ?? 'Surabaya',
+                'centroidLat' => (float) ($k['centroid_lat'] ?? $k['centroidLat'] ?? 0),
+                'centroidLng' => (float) ($k['centroid_lng'] ?? $k['centroidLng'] ?? 0),
+                '_count' => [
+                    'reports' => (int) ($k['reports_count'] ?? 0),
+                ],
+            ];
+        }, $all);
 
         return response()->json([
             'kelurahans' => $kelurahans,
-        ]);
+        ])->header('Cache-Control', 'public, max-age=60, s-maxage=60');
     }
 
     /**
@@ -41,22 +67,31 @@ class KelurahanController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $k = Kelurahan::withCount('reports')->find($id);
+        $k = $this->kelurahanRepository->findById($id);
 
         if (!$k) {
             return response()->json(['message' => 'Kelurahan tidak ditemukan'], 404);
         }
 
+        $leaderboard = $this->counterRepository->getLeaderboard();
+        $reportCount = 0;
+        foreach ($leaderboard as $item) {
+            if ((string) ($item['kelurahan']['id'] ?? '') === (string) $id) {
+                $reportCount = (int) ($item['totalReports'] ?? 0);
+                break;
+            }
+        }
+
         return response()->json([
             'kelurahan' => [
-                'id' => $k->id,
-                'name' => $k->name,
-                'kecamatan' => $k->kecamatan,
-                'kota' => $k->kota,
-                'centroidLat' => (float) $k->centroid_lat,
-                'centroidLng' => (float) $k->centroid_lng,
+                'id' => (string) $k['id'],
+                'name' => $k['name'],
+                'kecamatan' => $k['kecamatan'],
+                'kota' => $k['kota'] ?? 'Surabaya',
+                'centroidLat' => (float) ($k['centroid_lat'] ?? $k['centroidLat'] ?? 0),
+                'centroidLng' => (float) ($k['centroid_lng'] ?? $k['centroidLng'] ?? 0),
                 '_count' => [
-                    'reports' => (int) $k->reports_count,
+                    'reports' => $reportCount,
                 ],
             ],
         ]);
@@ -64,14 +99,20 @@ class KelurahanController extends Controller
 
     /**
      * GET /api/kelurahans/geo/bounds
-     * 
-     * Get Surabaya city bounding box and center coordinates
      */
     public function geoBounds(): JsonResponse
     {
         return response()->json([
-            'bounds' => \App\Services\GeofenceValidator::getBoundingBox(),
-            'center' => \App\Services\GeofenceValidator::getSurabayaCenter(),
+            'bounds' => [
+                'minLat' => -7.3500,
+                'maxLat' => -7.1500,
+                'minLng' => 112.6000,
+                'maxLng' => 112.8500,
+            ],
+            'center' => [
+                'lat' => -7.2575,
+                'lng' => 112.7521,
+            ],
         ]);
     }
 }

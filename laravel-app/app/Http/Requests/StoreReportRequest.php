@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Category;
+use App\Contracts\Repositories\CategoryRepositoryInterface;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreReportRequest extends FormRequest
@@ -15,9 +15,13 @@ class StoreReportRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if (!$this->has('category') && $this->filled('categoryId')) {
-            $cat = Category::find($this->input('categoryId'));
-            if ($cat) {
-                $this->merge(['category' => $cat->type]);
+            $catRepo = app(CategoryRepositoryInterface::class);
+            $categories = $catRepo->all();
+            foreach ($categories as $cat) {
+                if ((string) ($cat['id'] ?? '') === (string) $this->input('categoryId')) {
+                    $this->merge(['category' => $cat['type']]);
+                    break;
+                }
             }
         }
     }
@@ -31,7 +35,7 @@ class StoreReportRequest extends FormRequest
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'address' => ['nullable', 'string', 'max:500'],
-            'kelurahanId' => ['nullable', 'string', 'exists:kelurahans,id'],
+            'kelurahanId' => ['nullable', 'string'],
             'audioTranscript' => ['nullable', 'string'],
             'photos' => ['nullable', 'array', 'max:4'],
             'photos.*' => ['file', 'mimes:jpeg,jpg,png,webp', 'max:10240'],

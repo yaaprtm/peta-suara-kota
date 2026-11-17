@@ -219,6 +219,10 @@ class InMemoryReportRepository implements ReportRepositoryInterface
 
         $report['id'] = $id;
         $report['tracking_code'] = $code;
+        $report['lat'] = (float) ($data['lat'] ?? $data['latitude'] ?? 0);
+        $report['lng'] = (float) ($data['lng'] ?? $data['longitude'] ?? 0);
+        $report['latitude'] = $report['lat'];
+        $report['longitude'] = $report['lng'];
 
         $this->reports[$id] = $report;
 

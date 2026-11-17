@@ -2,92 +2,160 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Repositories\CategoryRepositoryInterface;
+use App\Contracts\Repositories\KelurahanRepositoryInterface;
+use App\Contracts\Repositories\ReportRepositoryInterface;
+use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreReportRequest;
 use App\Http\Requests\UpdateReportStatusRequest;
-use App\Http\Resources\ReportResource;
-use App\Models\Category;
-use App\Models\Report;
-use App\Models\StatusLog;
 use App\Services\GeofenceValidator;
-use App\Services\KecamatanService;
 use App\Services\StatusWorkflowManager;
 use App\Services\StorageService;
 use App\Services\UrgencyScorer;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
+    protected ReportRepositoryInterface $reportRepository;
+    protected KelurahanRepositoryInterface $kelurahanRepository;
+    protected CategoryRepositoryInterface $categoryRepository;
+    protected UserRepositoryInterface $userRepository;
+
+    public function __construct(
+        ReportRepositoryInterface $reportRepository,
+        KelurahanRepositoryInterface $kelurahanRepository,
+        CategoryRepositoryInterface $categoryRepository,
+        UserRepositoryInterface $userRepository
+    ) {
+        $this->reportRepository = $reportRepository;
+        $this->kelurahanRepository = $kelurahanRepository;
+        $this->categoryRepository = $categoryRepository;
+        $this->userRepository = $userRepository;
+    }
+
     /**
-     * GET /api/reports/nearby?lat=&lng=&radius=&limit=
-     * Cari laporan terdekat dari koordinat tertentu menggunakan Haversine formula.
-     * Digunakan oleh fitur "Terdekat dari Saya" untuk petugas.
+     * Helper: format laporan ke array JSON standar persis seperti ReportResource
+     */
+    private function formatReport(array $r): array
+    {
+        $id = (string) ($r['id'] ?? '');
+        $trackingCode = $r['tracking_code'] ?? ('PSK-' . strtoupper(substr(str_replace('-', '', $id), 0, 8)));
+        $skor = (int) ($r['skor_urgensi'] ?? 30);
+
+        $urgencyLevel = 'RENDAH';
+        if ($skor >= 70) {
+            $urgencyLevel = 'TINGGI';
+        } elseif ($skor >= 40) {
+            $urgencyLevel = 'SEDANG';
+        }
+
+        // Relasi kelurahan
+        $kelurahan = null;
+        if (!empty($r['kelurahan_id'])) {
+            $kData = $this->kelurahanRepository->findById((string) $r['kelurahan_id']);
+            if ($kData) {
+                $kelurahan = [
+                    'id' => (string) $kData['id'],
+                    'name' => $kData['name'],
+                    'kecamatan' => $kData['kecamatan'],
+                ];
+            }
+        }
+
+        // Relasi user
+        $user = null;
+        if (!empty($r['user_id'])) {
+            $uData = $this->userRepository->findById((string) $r['user_id']);
+            if ($uData) {
+                $user = [
+                    'id' => (string) $uData['id'],
+                    'name' => $uData['name'] ?? '',
+                    'avatar' => $uData['avatar'] ?? null,
+                ];
+            }
+        }
+
+        // Status logs
+        $rawLogs = $r['status_logs'] ?? [];
+        $statusLogs = array_map(function ($log) {
+            return [
+                'id' => (string) ($log['id'] ?? ''),
+                'reportId' => (string) ($log['report_id'] ?? ''),
+                'fromStatus' => $log['from_status'] ?? null,
+                'toStatus' => $log['to_status'] ?? '',
+                'note' => $log['note'] ?? null,
+                'changedById' => $log['changed_by_id'] ?? null,
+                'changedAt' => $log['changed_at'] ?? $log['created_at'] ?? null,
+                'changedBy' => !empty($log['changed_by']) ? $log['changed_by'] : null,
+            ];
+        }, $rawLogs);
+
+        return [
+            'id' => $id,
+            'trackingCode' => $trackingCode,
+            'title' => $r['title'] ?? '',
+            'description' => $r['description'] ?? '',
+            'category' => $r['category'] ?? 'LAINNYA',
+            'status' => $r['status'] ?? 'BARU',
+            'latitude' => (float) ($r['latitude'] ?? $r['lat'] ?? 0),
+            'longitude' => (float) ($r['longitude'] ?? $r['lng'] ?? 0),
+            'address' => $r['address'] ?? '',
+            'kelurahanId' => $r['kelurahan_id'] ?? null,
+            'kecamatan' => $r['kecamatan'] ?? '',
+            'skorUrgensi' => $skor,
+            'upvotesCount' => (int) ($r['upvotes_count'] ?? $r['upvotes'] ?? 0),
+            'urgensiKeywords' => $r['urgensi_keywords'] ?? [],
+            'urgencyLevel' => $urgencyLevel,
+            'photos' => $r['photos'] ?? [],
+            'completionPhotos' => $r['completion_photos'] ?? [],
+            'completionNote' => $r['completion_note'] ?? null,
+            'audioUrl' => $r['audio_url'] ?? null,
+            'audioTranscript' => $r['audio_transcript'] ?? null,
+            'userId' => $r['user_id'] ?? null,
+            'categoryId' => $r['category_id'] ?? null,
+            'createdAt' => $r['created_at'] ?? null,
+            'updatedAt' => $r['updated_at'] ?? null,
+            'resolvedAt' => $r['resolved_at'] ?? null,
+            'user' => $user,
+            'kelurahan' => $kelurahan,
+            'categoryRef' => null,
+            'statusLogs' => $statusLogs,
+        ];
+    }
+
+    /**
+     * GET /api/reports/nearby
      */
     public function nearby(Request $request): JsonResponse
     {
-        $lat    = (float) $request->query('lat', 0);
-        $lng    = (float) $request->query('lng', 0);
-        $radius = min((float) ($request->query('radius', 2)), 10); // max 10 km
-        $limit  = min((int) ($request->query('limit', 20)), 50);
+        $lat = (float) $request->query('lat', 0);
+        $lng = (float) $request->query('lng', 0);
+        $radius = min((float) ($request->query('radius', 2)), 10);
+        $limit = min((int) ($request->query('limit', 20)), 50);
 
         if ($lat === 0.0 && $lng === 0.0) {
             return response()->json(['message' => 'Parameter lat dan lng wajib diisi.'], 400);
         }
 
-        // Pre-filter bounding box ≈ radius/111 derajat (1 derajat ≈ 111 km)
-        $delta = $radius / 111.0;
+        $items = $this->reportRepository->nearby($lat, $lng, $radius, $limit);
 
-        $reports = Report::with([
-            'user'     => fn($q) => $q->select(['id', 'name', 'avatar']),
-            'kelurahan'=> fn($q) => $q->select(['id', 'name', 'kecamatan']),
-        ])
-        ->whereBetween('latitude',  [$lat - $delta, $lat + $delta])
-        ->whereBetween('longitude', [$lng - $delta, $lng + $delta])
-        ->whereNotIn('status', ['SELESAI', 'DITOLAK']) // hanya laporan aktif
-        ->get();
-
-        // Hitung jarak Haversine di PHP, filter tepat, urutkan terdekat
-        $withDistance = $reports->map(function ($r) use ($lat, $lng) {
-            $r->distance_km = self::haversineKm($lat, $lng, (float)$r->latitude, (float)$r->longitude);
-            return $r;
-        })
-        ->filter(fn($r) => $r->distance_km <= $radius + 0.01)
-        ->sortBy('distance_km')
-        ->take($limit)
-        ->values();
-
-        $data = $withDistance->map(function ($r) {
-            $resource = (new ReportResource($r))->resolve();
-            $resource['distanceKm'] = round($r->distance_km, 3);
-            return $resource;
-        });
+        $data = array_map(function ($r) {
+            $formatted = $this->formatReport($r);
+            $formatted['distanceKm'] = $r['distance_km'] ?? null;
+            return $formatted;
+        }, $items);
 
         return response()->json([
-            'reports'    => $data,
-            'count'      => $data->count(),
-            'centerLat'  => $lat,
-            'centerLng'  => $lng,
-            'radiusKm'   => $radius,
+            'reports' => $data,
+            'count' => count($data),
+            'centerLat' => $lat,
+            'centerLng' => $lng,
+            'radiusKm' => $radius,
         ]);
-    }
-
-    /**
-     * Haversine formula — jarak antara dua koordinat dalam kilometer.
-     */
-    private static function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
-    {
-        $R  = 6371.0; // Radius bumi dalam km
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLng = deg2rad($lng2 - $lng1);
-        $a  = sin($dLat / 2) ** 2
-            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
-        $c  = 2 * atan2(sqrt($a), sqrt(1 - $a));
-        return $R * $c;
     }
 
     /**
@@ -95,60 +163,38 @@ class ReportController extends Controller
      */
     public function viewport(Request $request): JsonResponse
     {
-        $query = Report::query()->with([
-            'user' => fn($q) => $q->select(['id', 'name', 'avatar']),
-            'kelurahan' => fn($q) => $q->select(['id', 'name', 'kecamatan']),
-        ]);
-
-        // 1. Bounding box filter [minLng, minLat, maxLng, maxLat]
+        $params = [];
         if ($bbox = $request->query('bbox')) {
             $parts = array_map('floatval', explode(',', $bbox));
             if (count($parts) === 4) {
                 [$minLng, $minLat, $maxLng, $maxLat] = $parts;
-                $query->whereBetween('latitude', [min($minLat, $maxLat), max($minLat, $maxLat)])
-                      ->whereBetween('longitude', [min($minLng, $maxLng), max($minLng, $maxLng)]);
+                $params['minLat'] = min($minLat, $maxLat);
+                $params['maxLat'] = max($minLat, $maxLat);
+                $params['minLng'] = min($minLng, $maxLng);
+                $params['maxLng'] = max($minLng, $maxLng);
             }
         }
 
-        // 2. Date filters
-        if ($startDate = $request->query('startDate')) {
-            $query->where('created_at', '>=', Carbon::parse($startDate));
-        }
-        if ($endDate = $request->query('endDate')) {
-            $query->where('created_at', '<=', Carbon::parse($endDate)->endOfDay());
-        }
-
-        // 3. Category & Status
         if ($category = $request->query('category')) {
-            $query->where('category', $category);
+            $params['category'] = $category;
         }
         if ($status = $request->query('status')) {
-            $query->where('status', $status);
+            $params['status'] = $status;
         }
-
-        // 4. Kecamatan
         if ($kecamatan = $request->query('kecamatan')) {
-            $query->where(function ($q) use ($kecamatan) {
-                $q->where('kecamatan', $kecamatan)
-                  ->orWhereHas('kelurahan', fn($k) => $k->where('kecamatan', $kecamatan));
-            });
+            $params['kecamatan'] = $kecamatan;
         }
+        $params['limit'] = min((int) ($request->query('limit') ?: 300), 500);
 
-        // Limit up to 500
-        $limit = min((int) ($request->query('limit') ?: 300), 500);
-
-        $reports = $query->orderByDesc('skor_urgensi')
-                         ->orderByDesc('created_at')
-                         ->limit($limit)
-                         ->get();
-
+        $reports = $this->reportRepository->viewport($params);
+        $formatted = array_map(fn($r) => $this->formatReport($r), $reports);
         $zoom = $request->query('zoom');
 
         return response()->json([
-            'reports' => ReportResource::collection($reports),
-            'count' => $reports->count(),
+            'reports' => $formatted,
+            'count' => count($formatted),
             'zoom' => $zoom !== null ? (float) $zoom : null,
-        ]);
+        ])->header('Cache-Control', 'public, max-age=20, s-maxage=20');
     }
 
     /**
@@ -156,53 +202,40 @@ class ReportController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Report::query()->with([
-            'user' => fn($q) => $q->select(['id', 'name', 'avatar']),
-            'kelurahan' => fn($q) => $q->select(['id', 'name', 'kecamatan']),
-        ]);
-
-        if ($startDate = $request->query('startDate')) {
-            $query->where('created_at', '>=', Carbon::parse($startDate));
-        }
-        if ($endDate = $request->query('endDate')) {
-            $query->where('created_at', '<=', Carbon::parse($endDate)->endOfDay());
-        }
-
+        $filters = [];
         if ($category = $request->query('category')) {
-            $query->where('category', $category);
+            $filters['category'] = $category;
         }
         if ($status = $request->query('status')) {
-            $query->where('status', $status);
+            $filters['status'] = $status;
         }
         if ($kelurahanId = $request->query('kelurahanId')) {
-            $query->where('kelurahan_id', $kelurahanId);
+            $filters['kelurahan_id'] = $kelurahanId;
         }
         if ($kecamatan = $request->query('kecamatan')) {
-            $query->where(function ($q) use ($kecamatan) {
-                $q->where('kecamatan', $kecamatan)
-                  ->orWhereHas('kelurahan', fn($k) => $k->where('kecamatan', $kecamatan));
-            });
+            $filters['kecamatan'] = $kecamatan;
+        }
+        if ($search = $request->query('search')) {
+            $filters['search'] = $search;
         }
 
-        if ($minScore = $request->query('minScore')) {
-            $query->where('skor_urgensi', '>=', (int) $minScore);
-        }
-        if ($maxScore = $request->query('maxScore')) {
-            $query->where('skor_urgensi', '<=', (int) $maxScore);
-        }
-
-        $limit = min((int) ($request->query('limit') ?: 100), 100);
+        $limit = min((int) ($request->query('limit') ?: 50), 100);
         $page = (int) ($request->query('page') ?: 1);
+        $offset = ($page - 1) * $limit;
 
-        $paginator = $query->orderByDesc('created_at')->paginate($limit, ['*'], 'page', $page);
+        $result = $this->reportRepository->list($filters, $limit, $offset);
+        $formatted = array_map(fn($r) => $this->formatReport($r), $result['data']);
+
+        $total = $result['total'];
+        $pages = (int) ceil($total / max(1, $limit));
 
         return response()->json([
-            'reports' => ReportResource::collection($paginator->items()),
+            'reports' => $formatted,
             'pagination' => [
-                'total' => $paginator->total(),
-                'page' => $paginator->currentPage(),
-                'limit' => $paginator->perPage(),
-                'pages' => $paginator->lastPage(),
+                'total' => $total,
+                'page' => $page,
+                'limit' => $limit,
+                'pages' => max(1, $pages),
             ],
         ]);
     }
@@ -212,19 +245,13 @@ class ReportController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $report = Report::with([
-            'user' => fn($q) => $q->select(['id', 'name', 'avatar']),
-            'kelurahan',
-            'statusLogs.changedBy' => fn($q) => $q->select(['id', 'name', 'role']),
-            'categoryRef',
-        ])->find($id);
-
+        $report = $this->reportRepository->findById($id);
         if (!$report) {
             return response()->json(['message' => 'Laporan tidak ditemukan'], 404);
         }
 
         return response()->json([
-            'report' => new ReportResource($report),
+            'report' => $this->formatReport($report),
         ]);
     }
 
@@ -236,7 +263,7 @@ class ReportController extends Controller
         $lat = (float) $request->latitude;
         $lng = (float) $request->longitude;
 
-        // Geofence check
+        // Validasi geofence Surabaya
         $validation = GeofenceValidator::validate($lat, $lng);
         if (!$validation['valid']) {
             return response()->json(['message' => $validation['message']], 400);
@@ -244,7 +271,7 @@ class ReportController extends Controller
 
         $detectedKecamatan = $validation['kecamatan'];
 
-        // Upload foto — kegagalan tidak memblok pembuatan laporan
+        // Upload foto
         $photoPaths = [];
         if ($request->hasFile('photos')) {
             try {
@@ -258,6 +285,7 @@ class ReportController extends Controller
             }
         }
 
+        // Upload audio
         $audioPath = null;
         if ($request->hasFile('audio')) {
             try {
@@ -277,84 +305,58 @@ class ReportController extends Controller
             $request->description . ' ' .
             ($request->audioTranscript ?? '')
         );
-        $urgency     = UrgencyScorer::analyzeUrgency($textToAnalyze, $request->category);
-        $categoryRef = Category::where('type', $request->category)->first();
+        $urgency = UrgencyScorer::analyzeUrgency($textToAnalyze, $request->category);
 
-        // Bungkus pembuatan report + status_log dalam satu transaksi
-        // agar tidak ada data setengah tersimpan bila salah satu langkah gagal
+        $currentUser = $request->user();
+        $userId = $currentUser ? (string) $currentUser->id : null;
+
+        $reportData = [
+            'title' => $request->title,
+            'description' => $request->description,
+            'category' => $request->category,
+            'status' => 'BARU',
+            'latitude' => $lat,
+            'longitude' => $lng,
+            'address' => $request->address,
+            'kelurahan_id' => $request->kelurahanId,
+            'kecamatan' => $detectedKecamatan,
+            'skor_urgensi' => $urgency['skorUrgensi'],
+            'urgensi_keywords' => $urgency['urgensiKeywords'],
+            'photos' => $photoPaths,
+            'audio_url' => $audioPath,
+            'audio_transcript' => $request->audioTranscript,
+            'user_id' => $userId,
+            'note' => 'Laporan diterima oleh sistem',
+        ];
+
         try {
-            $report = \Illuminate\Support\Facades\DB::transaction(function () use (
-                $request, $lat, $lng, $detectedKecamatan,
-                $urgency, $categoryRef, $photoPaths, $audioPath
-            ) {
-                $report = Report::create([
-                    'title'            => $request->title,
-                    'description'      => $request->description,
-                    'category'         => $request->category,
-                    'status'           => 'BARU',
-                    'latitude'         => $lat,
-                    'longitude'        => $lng,
-                    'address'          => $request->address,
-                    'kelurahan_id'     => $request->kelurahanId,
-                    'kecamatan'        => $detectedKecamatan,
-                    'skor_urgensi'     => $urgency['skorUrgensi'],
-                    'urgensi_keywords' => $urgency['urgensiKeywords'],
-                    'photos'           => $photoPaths,
-                    'audio_url'        => $audioPath,
-                    'audio_transcript' => $request->audioTranscript,
-                    'user_id'          => $request->user()->id,
-                    'category_id'      => $categoryRef?->id,
-                ]);
-
-                StatusLog::create([
-                    'report_id'      => $report->id,
-                    'from_status'    => null,
-                    'to_status'      => 'BARU',
-                    'note'           => 'Laporan diterima oleh sistem',
-                    'changed_by_id'  => $request->user()->id,
-                    'changed_at'     => now(),
-                ]);
-
-                return $report;
-            });
+            $created = $this->reportRepository->create($reportData);
         } catch (\Throwable $e) {
             $requestId = substr(md5(uniqid('', true)), 0, 12);
-            error_log(json_encode([
-                'request_id' => $requestId,
-                'exception'  => get_class($e),
-                'message'    => $e->getMessage(),
-                'file'       => basename($e->getFile()) . ':' . $e->getLine(),
-            ]));
             return response()->json([
-                'message'    => 'Laporan gagal disimpan. Coba lagi dalam beberapa saat.',
+                'message' => 'Laporan gagal disimpan. Coba lagi dalam beberapa saat.',
                 'request_id' => $requestId,
             ], 500);
         }
 
-        $report->load(['user', 'kelurahan']);
-
         return response()->json([
             'message' => 'Laporan berhasil dibuat',
-            'report'  => new ReportResource($report),
+            'report' => $this->formatReport($created),
         ], 201);
     }
 
     /**
-     * PATCH /api/reports/{id}/status
-     */
-    /**
      * GET /api/reports/{id}/status/transitions
-     * 
-     * Get valid next status transitions for a report
      */
     public function getValidTransitions(string $id): JsonResponse
     {
-        $report = Report::find($id);
+        $report = $this->reportRepository->findById($id);
         if (!$report) {
             return response()->json(['message' => 'Laporan tidak ditemukan'], 404);
         }
 
-        $validNextStatuses = StatusWorkflowManager::getValidNextStatuses($report->status);
+        $currentStatus = $report['status'] ?? 'BARU';
+        $validNextStatuses = StatusWorkflowManager::getValidNextStatuses($currentStatus);
 
         $transitions = array_map(function ($status) {
             return [
@@ -366,27 +368,24 @@ class ReportController extends Controller
         }, $validNextStatuses);
 
         return response()->json([
-            'currentStatus' => $report->status,
+            'currentStatus' => $currentStatus,
             'validTransitions' => array_values($transitions),
         ]);
     }
 
     /**
      * PATCH /api/reports/{id}/status
-     * 
-     * Update report status (PETUGAS, ADMIN, SUPERADMIN only)
      */
     public function updateStatus(UpdateReportStatusRequest $request, string $id): JsonResponse
     {
-        $report = Report::find($id);
+        $report = $this->reportRepository->findById($id);
         if (!$report) {
             return response()->json(['message' => 'Laporan tidak ditemukan'], 404);
         }
 
-        $oldStatus = $report->status;
+        $oldStatus = $report['status'] ?? 'BARU';
         $newStatus = $request->status;
 
-        // Validate status transition
         $transitionValidation = StatusWorkflowManager::validateTransition($oldStatus, $newStatus);
         if (!$transitionValidation['valid']) {
             return response()->json([
@@ -394,7 +393,6 @@ class ReportController extends Controller
             ], 400);
         }
 
-        // Check if completion note is required
         if (StatusWorkflowManager::requiresCompletionNote($newStatus)) {
             $note = $request->completion_note ?? $request->note;
             if (empty($note)) {
@@ -404,18 +402,9 @@ class ReportController extends Controller
             }
         }
 
-        $updateData = ['status' => $newStatus];
-
-        // Handle SELESAI status
+        $completionData = null;
         if ($newStatus === 'SELESAI') {
-            $updateData['resolved_at'] = now();
-            if ($request->filled('completion_note')) {
-                $updateData['completion_note'] = $request->completion_note;
-            } elseif ($request->filled('note')) {
-                $updateData['completion_note'] = $request->note;
-            }
-
-            $compPhotos = $report->completion_photos ?? [];
+            $compPhotos = $report['completion_photos'] ?? [];
             if ($request->hasFile('completion_photos')) {
                 $newPhotos = StorageService::storeFiles(
                     $request->file('completion_photos'),
@@ -423,120 +412,89 @@ class ReportController extends Controller
                     'public'
                 );
                 $compPhotos = array_merge($compPhotos, $newPhotos);
-            } elseif ($request->filled('completion_photos')) {
-                $raw = $request->input('completion_photos');
-                if (is_array($raw)) {
-                    $compPhotos = array_values(array_unique(array_merge($compPhotos, $raw)));
-                } elseif (is_string($raw)) {
-                    $compPhotos[] = $raw;
-                }
             }
 
-            if (!empty($compPhotos)) {
-                $updateData['completion_photos'] = $compPhotos;
-            }
+            $completionData = [
+                'note' => $request->completion_note ?? $request->note,
+                'photos' => $compPhotos,
+            ];
+        } elseif ($newStatus === 'DITOLAK') {
+            $completionData = [
+                'note' => $request->completion_note ?? $request->note,
+            ];
         }
 
-        // Handle DITOLAK status
-        if ($newStatus === 'DITOLAK') {
-            if ($request->filled('completion_note')) {
-                $updateData['completion_note'] = $request->completion_note;
-            } elseif ($request->filled('note')) {
-                $updateData['completion_note'] = $request->note;
-            }
-        }
+        $currentUser = $request->user();
+        $changedBy = $currentUser ? [
+            'id' => (string) $currentUser->id,
+            'name' => $currentUser->name,
+            'role' => $currentUser->role,
+        ] : null;
 
-        // Clear resolved_at if reverting from SELESAI
-        if ($oldStatus === 'SELESAI' && $newStatus !== 'SELESAI') {
-            $updateData['resolved_at'] = null;
-        }
-
-        $report->update($updateData);
-
-        // Create status log entry
-        StatusLog::create([
-            'report_id' => $report->id,
-            'from_status' => $oldStatus,
-            'to_status' => $newStatus,
-            'note' => $request->note ?? $request->completion_note,
-            'changed_by_id' => $request->user()->id,
-            'changed_at' => now(),
-        ]);
-
-        $report->load(['user', 'kelurahan', 'statusLogs.changedBy', 'categoryRef']);
+        $updated = $this->reportRepository->updateStatus(
+            $id,
+            $newStatus,
+            $request->note ?? $request->completion_note,
+            $changedBy,
+            $completionData
+        );
 
         return response()->json([
             'message' => 'Status berhasil diperbarui',
-            'report' => new ReportResource($report),
+            'report' => $this->formatReport($updated),
         ]);
     }
 
     /**
      * POST /api/reports/{id}/upvote
-     * Citizen upvote / support count
      */
     public function upvote(Request $request, string $id): JsonResponse
     {
-        $report = Report::find($id);
+        $report = $this->reportRepository->findById($id);
         if (!$report) {
             return response()->json(['message' => 'Laporan tidak ditemukan'], 404);
         }
 
-        $report->increment('upvotes_count');
+        $updated = $this->reportRepository->upvote($id);
+        $upvotes = (int) ($updated['upvotes_count'] ?? $updated['upvotes'] ?? 0);
 
         return response()->json([
             'message' => 'Dukungan berhasil ditambahkan',
-            'upvotesCount' => $report->upvotes_count,
-            'report' => new ReportResource($report),
+            'upvotesCount' => $upvotes,
+            'report' => $this->formatReport($updated),
         ]);
     }
 
     /**
      * GET /api/reports/track/{code}
-     * Quick public ticket search
      */
     public function track(string $code): JsonResponse
     {
-        $code = trim($code);
-        $cleanCode = ltrim($code, '#');
-
-        $report = Report::with([
-            'user' => fn($q) => $q->select(['id', 'name', 'avatar']),
-            'kelurahan',
-            'statusLogs.changedBy' => fn($q) => $q->select(['id', 'name', 'role']),
-            'categoryRef',
-        ])
-        ->where(function ($q) use ($cleanCode) {
-            $q->where('tracking_code', $cleanCode)
-              ->orWhere('id', $cleanCode);
-        })
-        ->first();
-
+        $report = $this->reportRepository->findByTrackingCode($code);
         if (!$report) {
             return response()->json(['message' => 'Nomor tiket laporan tidak ditemukan.'], 404);
         }
 
         return response()->json([
-            'report' => new ReportResource($report),
+            'report' => $this->formatReport($report),
         ]);
     }
 
     /**
      * GET /api/reports/export
-     * Official CSV Export for administration & OPD disposition
      */
     public function export(Request $request): StreamedResponse
     {
-        $query = Report::with(['kelurahan', 'user'])->orderByDesc('created_at');
-
+        $filters = [];
         if ($cat = $request->query('category')) {
-            $query->where('category', $cat);
+            $filters['category'] = $cat;
         }
         if ($st = $request->query('status')) {
-            $query->where('status', $st);
+            $filters['status'] = $st;
         }
 
-        $reports = $query->limit(1000)->get();
+        $result = $this->reportRepository->list($filters, 1000);
+        $reports = $result['data'];
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -548,91 +506,23 @@ class ReportController extends Controller
 
         return response()->stream(function () use ($reports) {
             $handle = fopen('php://output', 'w');
-            // Write UTF-8 BOM for Microsoft Excel compatibility
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
-
-            fputcsv($handle, [
-                'No. Tiket',
-                'Tanggal Laporan',
-                'Judul Aduan',
-                'Kategori',
-                'Kecamatan',
-                'Kelurahan',
-                'Alamat Lengkap',
-                'Latitude',
-                'Longitude',
-                'Skor Urgensi',
-                'Level Urgensi',
-                'Dukungan Warga',
-                'Status',
-                'Waktu Selesai',
-                'Pelapor',
-            ]);
+            fputcsv($handle, ['ID', 'Nomor Tiket', 'Judul', 'Kategori', 'Status', 'Kecamatan', 'Alamat', 'Skor Urgensi', 'Dukungan Warga', 'Tanggal Dibuat']);
 
             foreach ($reports as $r) {
                 fputcsv($handle, [
-                    $r->tracking_code ?? ('PSK-' . strtoupper(substr(str_replace('-', '', (string) $r->id), 0, 8))),
-                    $r->created_at ? $r->created_at->format('Y-m-d H:i') : '-',
-                    $r->title,
-                    $r->category,
-                    $r->kecamatan ?? $r->kelurahan?->kecamatan ?? '-',
-                    $r->kelurahan?->name ?? '-',
-                    $r->address ?? '-',
-                    $r->latitude,
-                    $r->longitude,
-                    $r->skor_urgensi,
-                    strtoupper($r->urgency_level ?? 'SEDANG'),
-                    $r->upvotes_count ?? 0,
-                    $r->status,
-                    $r->resolved_at ? $r->resolved_at->format('Y-m-d H:i') : ($r->status === 'SELESAI' ? 'Selesai' : '-'),
-                    $r->user?->name ?? 'Warga Surabaya',
+                    $r['id'] ?? '',
+                    $r['tracking_code'] ?? '',
+                    $r['title'] ?? '',
+                    $r['category'] ?? '',
+                    $r['status'] ?? '',
+                    $r['kecamatan'] ?? '',
+                    $r['address'] ?? '',
+                    $r['skor_urgensi'] ?? 0,
+                    $r['upvotes_count'] ?? $r['upvotes'] ?? 0,
+                    $r['created_at'] ?? '',
                 ]);
             }
-
             fclose($handle);
         }, 200, $headers);
-    }
-
-    /**
-     * DELETE /api/reports/{id}
-     */
-    public function destroy(Request $request, string $id): JsonResponse
-    {
-        $report = Report::find($id);
-        if (!$report) {
-            return response()->json(['message' => 'Laporan tidak ditemukan'], 404);
-        }
-
-        $user = $request->user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
-        }
-
-        // Only owner or admin can delete
-        if ($report->user_id !== $user->id && !in_array($user->role, ['ADMIN', 'SUPERADMIN'])) {
-            return response()->json(['message' => 'Tidak memiliki akses'], 403);
-        }
-
-        $report->delete();
-
-        return response()->json(['message' => 'Laporan berhasil dihapus']);
-    }
-
-    /**
-     * GET /api/reports/stream
-     * Server-Sent Events (SSE) stream
-     */
-    public function stream(): StreamedResponse
-    {
-        return response()->stream(function () {
-            echo "retry: 5000\n\n";
-            ob_flush();
-            flush();
-        }, 200, [
-            'Content-Type' => 'text/event-stream',
-            'Cache-Control' => 'no-cache',
-            'Connection' => 'keep-alive',
-            'X-Accel-Buffering' => 'no',
-        ]);
     }
 }
