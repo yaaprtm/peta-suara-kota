@@ -7,3 +7,11 @@ uploads/
 Thumbs.db
 .kiro/
 docs/audit
+*firebase-credentials*.json
+*service-account*.json
+firebase-adminsdk*.json
+firebase-debug.log*
+firestore-debug.log*
+.firebase/
+test-results/
+playwright-report/
