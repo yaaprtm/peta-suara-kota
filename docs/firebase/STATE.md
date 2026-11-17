@@ -1,8 +1,8 @@
 # STATE MIGRASI FIREBASE
 
 ## 1. Tahap Saat Ini
-- **Tahap 3: Laporan dan Geospasial (Selesai)**
-- Menunggu instruksi pengguna ("lanjut") untuk memulai **Tahap 4: Migrasi Data dan Seeding**.
+- **Tahap 4: Migrasi Data dan Seeding (Selesai)**
+- Menunggu instruksi pengguna ("lanjut") untuk memulai **Tahap 5: Env, Vercel Config, dan CI**.
 
 ## 2. Riwayat dan Keputusan Arsitektur
 - **Branch**: `migrasi-firebase` (aktif).
@@ -14,7 +14,7 @@
 - **Session & Cache**: Driver sesi diubah ke `cookie`, cache ke `file`/`array`, queue ke `sync`. Tidak lagi membebani database SQL.
 - **Cache Header Data Publik**: Seluruh endpoint data peta publik (`/api/reports/viewport`, `/api/stats/*`, `/api/kelurahans`) memiliki header `Cache-Control` (`public, max-age=20, s-maxage=20`) untuk menghemat kuota Firestore secara drastis.
 
-## 3. Komponen yang Telah Selesai Dibuat (Tahap 1, 2, dan 3)
+## 3. Komponen yang Telah Selesai Dibuat (Tahap 1, 2, 3, dan 4)
 1. **Fondasi & Client**:
    - `FirestoreClientInterface` & `FirestoreRestClient`.
    - `StaticKelurahanRepository` & `StaticCategoryRepository`.
@@ -49,12 +49,30 @@
    - `StatsApiTest`: 3 passed, 13 assertions.
    - `KelurahanApiTest`: 3 passed, 14 assertions.
    - Total Keseluruhan: 50 tests, 2.872 assertions (100% lulus tanpa kegagalan).
+4. **Seeder dan Import Data (Tahap 4)**:
+   - `FirestoreSeedCommand` (`php artisan firestore:seed`):
+     - Seed 5 akun demo ke Firestore (1 ADMIN, 2 PETUGAS, 2 WARGA).
+     - Idempoten: cek email dulu sebelum insert, skip jika sudah ada.
+     - `--force`: timpa nama/role tanpa mengubah password.
+     - Password di-hash oleh `Hash::make()` Laravel (bukan plain text).
+   - `FirestoreImportFromSqlCommand` (`php artisan firestore:import-from-sql`):
+     - Impor users dari TiDB/MySQL ke Firestore (koneksi `mysql`).
+     - Impor reports dengan status_logs embed (batch select untuk menghindari N+1 SQL).
+     - `--dry-run`: pratinjau tanpa menulis ke Firestore.
+     - `--limit=N`: batasi records per entitas.
+     - `--force`: timpa dokumen yang sudah ada.
+     - `--skip-users`, `--skip-reports`, `--skip-counters`: kontrol granular.
+     - Setelah semua laporan diimpor: panggil `counterRepository->recalculate()` untuk kalkulasi ulang global_stats, leaderboard, dan kecamatan_density.
+     - Menulis langsung via `FirestoreClientInterface` (bypass counter increment di `FirestoreReportRepository::create()`) agar counter dikalkulasi sekali di akhir.
+   - `FirestoreSeedCommandTest`: 6 passed, 29 assertions.
+   - Total Keseluruhan: **56 tests, 2.901 assertions (100% lulus)**.
 
 ## 4. Status Database TiDB
 - Konfigurasi TiDB di `.env` dan `config/database.php` masih utuh dan tidak dihapus sesuai aturan (dilarang menghapus kode TiDB sebelum Tahap 6).
 
 ## 5. Langkah Berikutnya (Menunggu instruksi "lanjut")
-- **Tahap 4: Migrasi Data dan Seeding**:
-  - Perintah artisan seeder untuk master data Firestore (`php artisan firestore:seed`).
-  - Skrip ekspor data yang ada dari TiDB/MySQL ke Firestore (`php artisan firestore:import-from-sql`).
-  - Verifikasi integritas data dan kalkulasi ulang counter agregasi pasca-migrasi.
+- **Tahap 5: Env, Vercel Config, dan CI**:
+  - Perbarui `laravel-app/.env.example` dengan variabel Firebase.
+  - Perbarui `vercel.json` dengan env vars Firebase untuk deployment.
+  - Hapus test-test lama yang bergantung SQL: `DatabaseSeederTest.php`, `EndToEndIntegrationTest.php`, `InertiaPagesTest.php`, `RoleAccessMatrixTest.php`, `UserManagementApiTest.php`.
+  - Pastikan `phpunit.xml` hanya menjalankan test Firebase yang baru.
