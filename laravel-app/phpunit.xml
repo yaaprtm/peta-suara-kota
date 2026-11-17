@@ -32,6 +32,7 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="FILESYSTEM_DISK" value="local"/>
+        <env name="FIREBASE_DRIVER" value="inmemory"/>
         <env name="AWS_ACCESS_KEY_ID" value="fake"/>
         <env name="AWS_SECRET_ACCESS_KEY" value="fake"/>
     </php>

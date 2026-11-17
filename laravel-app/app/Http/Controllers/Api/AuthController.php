@@ -2,54 +2,74 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Auth\FirestoreUserProvider;
+use App\Contracts\Repositories\KelurahanRepositoryInterface;
+use App\Contracts\Repositories\TokenRepositoryInterface;
+use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Http\Controllers\Controller;
+use App\Models\Kelurahan;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    // ── Helper: buat token, simpan ke DB, return plaintext ──────────────────
-    private function createToken(User $user, string $name = 'auth-token'): string
-    {
-        $plaintext  = bin2hex(random_bytes(32)); // 64-char hex
-        $hashed     = hash('sha256', $plaintext);
+    protected UserRepositoryInterface $userRepository;
+    protected TokenRepositoryInterface $tokenRepository;
+    protected KelurahanRepositoryInterface $kelurahanRepository;
 
-        // Hapus token lama milik user ini agar tidak menumpuk
-        DB::table('personal_access_tokens')
-            ->where('tokenable_type', User::class)
-            ->where('tokenable_id', $user->id)
-            ->delete();
-
-        DB::table('personal_access_tokens')->insert([
-            'tokenable_type' => User::class,
-            'tokenable_id'   => $user->id,
-            'name'           => $name,
-            'token'          => $hashed,
-            'abilities'      => '["*"]',
-            'last_used_at'   => null,
-            'created_at'     => now(),
-            'updated_at'     => now(),
-        ]);
-
-        return $plaintext;
+    public function __construct(
+        UserRepositoryInterface $userRepository,
+        TokenRepositoryInterface $tokenRepository,
+        KelurahanRepositoryInterface $kelurahanRepository
+    ) {
+        $this->userRepository = $userRepository;
+        $this->tokenRepository = $tokenRepository;
+        $this->kelurahanRepository = $kelurahanRepository;
     }
 
-    // ── Helper: format user response ─────────────────────────────────────────
-    private function userArray(User $user): array
+    private function toUserInstance(array $userData): User
     {
+        $provider = Auth::guard('web')->getProvider();
+        if ($provider instanceof FirestoreUserProvider) {
+            return $provider->toUserInstance($userData);
+        }
+
+        $user = new User();
+        $user->forceFill($userData);
+        $user->exists = true;
+
+        if (!empty($userData['kelurahan_id'])) {
+            $kelData = $this->kelurahanRepository->findById((string) $userData['kelurahan_id']);
+            if ($kelData) {
+                $kel = new Kelurahan();
+                $kel->forceFill($kelData);
+                $kel->exists = true;
+                $user->setRelation('kelurahan', $kel);
+            }
+        }
+
+        return $user;
+    }
+
+    private function userArray(User|array $user): array
+    {
+        if (is_array($user)) {
+            $user = $this->toUserInstance($user);
+        }
+
         return [
-            'id'          => $user->id,
+            'id'          => (string) $user->id,
             'email'       => $user->email,
             'name'        => $user->name,
             'role'        => $user->role,
             'phone'       => $user->phone,
             'avatar'      => $user->avatar,
             'kelurahan'   => $user->kelurahan ? [
-                'id'         => $user->kelurahan->id,
+                'id'         => (string) $user->kelurahan->id,
                 'name'       => $user->kelurahan->name,
                 'kecamatan'  => $user->kelurahan->kecamatan,
                 'kota'       => $user->kelurahan->kota ?? 'Surabaya',
@@ -63,14 +83,32 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'email'       => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'email'       => ['required', 'string', 'email', 'max:255'],
             'password'    => ['required', 'string', 'min:6'],
             'name'        => ['required', 'string', 'min:2', 'max:255'],
             'phone'       => ['nullable', 'string', 'max:50'],
-            'kelurahanId' => ['nullable', 'string', 'exists:kelurahans,id'],
+            'kelurahanId' => ['nullable', 'string'],
         ]);
 
-        $user = User::create([
+        // Cek unik email di repository
+        $existing = $this->userRepository->findByEmail($validated['email']);
+        if ($existing) {
+            throw ValidationException::withMessages([
+                'email' => ['Email sudah terdaftar.'],
+            ]);
+        }
+
+        // Cek kelurahan jika ada
+        if (!empty($validated['kelurahanId'])) {
+            $kel = $this->kelurahanRepository->findById($validated['kelurahanId']);
+            if (!$kel) {
+                throw ValidationException::withMessages([
+                    'kelurahanId' => ['Kelurahan tidak valid.'],
+                ]);
+            }
+        }
+
+        $userData = $this->userRepository->create([
             'name'         => $validated['name'],
             'email'        => $validated['email'],
             'password'     => Hash::make($validated['password']),
@@ -80,8 +118,13 @@ class AuthController extends Controller
             'is_active'    => true,
         ]);
 
-        $user->load('kelurahan');
-        $token = $this->createToken($user, 'register');
+        $user = $this->toUserInstance($userData);
+        $token = $this->tokenRepository->createToken($userData['id'], 'register');
+
+        Auth::guard('web')->login($user, true);
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+        }
 
         return response()->json([
             'message'      => 'Registrasi berhasil',
@@ -101,23 +144,25 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $user = User::with('kelurahan')->where('email', $request->email)->first();
+        $userData = $this->userRepository->findByEmail($request->email);
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (!$userData || !Hash::check($request->password, $userData['password'] ?? '')) {
             return response()->json(['message' => 'Email atau password salah'], 401);
         }
 
-        if (!$user->is_active) {
+        if (!($userData['is_active'] ?? true)) {
             return response()->json(['message' => 'Akun Anda telah dinonaktifkan.'], 403);
         }
 
-        // FIX: Login ke session web juga agar navigasi ke halaman Inertia (/dashboard dsb) berhasil
-        Auth::login($user, true);
+        $user = $this->toUserInstance($userData);
+
+        Auth::guard('web')->login($user, true);
         if ($request->hasSession()) {
             $request->session()->regenerate();
         }
 
-        $token = $this->createToken($user, 'login');
+        $token = $this->tokenRepository->createToken($userData['id'], 'login');
+
         return response()->json([
             'message'      => 'Login berhasil',
             'accessToken'  => $token,
@@ -131,15 +176,11 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        // Hapus token dari DB
         $bearerToken = $request->bearerToken();
         if ($bearerToken) {
-            DB::table('personal_access_tokens')
-                ->where('token', hash('sha256', $bearerToken))
-                ->delete();
+            $this->tokenRepository->deleteToken($bearerToken);
         }
 
-        // Logout web session jika ada
         if (Auth::check()) {
             Auth::guard('web')->logout();
             if ($request->hasSession()) {
@@ -160,8 +201,6 @@ class AuthController extends Controller
         if (!$user) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
-
-        $user->load('kelurahan');
 
         return response()->json(['user' => $this->userArray($user)]);
     }
