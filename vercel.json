@@ -32,5 +32,14 @@
       "src": "/(.*)",
       "dest": "/laravel-app/api/index.php"
     }
-  ]
+  ],
+  "env": {
+    "FIREBASE_DRIVER": "firestore",
+    "FIREBASE_PROJECT_ID": "@firebase_project_id",
+    "FIREBASE_DATABASE_ID": "@firebase_database_id",
+    "FIREBASE_CREDENTIALS_BASE64": "@firebase_credentials_base64",
+    "SESSION_DRIVER": "cookie",
+    "CACHE_STORE": "file",
+    "QUEUE_CONNECTION": "sync"
+  }
 }

@@ -1,8 +1,8 @@
 # STATE MIGRASI FIREBASE
 
 ## 1. Tahap Saat Ini
-- **Tahap 4: Migrasi Data dan Seeding (Selesai)**
-- Menunggu instruksi pengguna ("lanjut") untuk memulai **Tahap 5: Env, Vercel Config, dan CI**.
+- **Tahap 5: Env, Vercel Config, dan CI (Selesai)**
+- Menunggu instruksi pengguna ("lanjut") untuk memulai **Tahap 6: Hapus Jejak TiDB**.
 
 ## 2. Riwayat dan Keputusan Arsitektur
 - **Branch**: `migrasi-firebase` (aktif).
@@ -14,7 +14,7 @@
 - **Session & Cache**: Driver sesi diubah ke `cookie`, cache ke `file`/`array`, queue ke `sync`. Tidak lagi membebani database SQL.
 - **Cache Header Data Publik**: Seluruh endpoint data peta publik (`/api/reports/viewport`, `/api/stats/*`, `/api/kelurahans`) memiliki header `Cache-Control` (`public, max-age=20, s-maxage=20`) untuk menghemat kuota Firestore secara drastis.
 
-## 3. Komponen yang Telah Selesai Dibuat (Tahap 1, 2, 3, dan 4)
+## 3. Komponen yang Telah Selesai Dibuat (Tahap 1, 2, 3, 4, dan 5)
 1. **Fondasi & Client**:
    - `FirestoreClientInterface` & `FirestoreRestClient`.
    - `StaticKelurahanRepository` & `StaticCategoryRepository`.
@@ -66,13 +66,24 @@
      - Menulis langsung via `FirestoreClientInterface` (bypass counter increment di `FirestoreReportRepository::create()`) agar counter dikalkulasi sekali di akhir.
    - `FirestoreSeedCommandTest`: 6 passed, 29 assertions.
    - Total Keseluruhan: **56 tests, 2.901 assertions (100% lulus)**.
+5. **Env, Vercel Config, dan CI (Tahap 5)**:
+   - `laravel-app/.env.example`: ditambahkan blok Firebase (FIREBASE_DRIVER, FIREBASE_PROJECT_ID, FIREBASE_DATABASE_ID, FIREBASE_CREDENTIALS_PATH, FIREBASE_CREDENTIALS_BASE64, FIREBASE_EMULATOR_HOST). Komentar SESSION/CACHE/QUEUE diperbarui sesuai arsitektur cookie/file/sync.
+   - `vercel.json`: ditambahkan blok `env` dengan referensi Vercel secret (@firebase_project_id, @firebase_database_id, @firebase_credentials_base64) dan override driver (SESSION_DRIVER=cookie, CACHE_STORE=file, QUEUE_CONNECTION=sync).
+   - `laravel-app/phpunit.xml`: testsuite Feature diubah dari `<directory>` menjadi daftar file eksplisit (6 file Firebase). Test lama SQL tidak lagi dijalankan.
+   - `laravel-app/tests/Feature/legacy-sql/`: 9 file test lama (berbasis Eloquent/SQL) dipindahkan ke sini, belum dihapus (menunggu Tahap 6 "verifikasi lulus").
+   - Verifikasi: `php vendor/bin/phpunit` → **56 tests, 2.901 assertions, 0 kegagalan**.
 
 ## 4. Status Database TiDB
 - Konfigurasi TiDB di `.env` dan `config/database.php` masih utuh dan tidak dihapus sesuai aturan (dilarang menghapus kode TiDB sebelum Tahap 6).
 
 ## 5. Langkah Berikutnya (Menunggu instruksi "lanjut")
-- **Tahap 5: Env, Vercel Config, dan CI**:
-  - Perbarui `laravel-app/.env.example` dengan variabel Firebase.
-  - Perbarui `vercel.json` dengan env vars Firebase untuk deployment.
-  - Hapus test-test lama yang bergantung SQL: `DatabaseSeederTest.php`, `EndToEndIntegrationTest.php`, `InertiaPagesTest.php`, `RoleAccessMatrixTest.php`, `UserManagementApiTest.php`.
-  - Pastikan `phpunit.xml` hanya menjalankan test Firebase yang baru.
+- **Tahap 6: Hapus Jejak TiDB** (HANYA setelah instruksi "verifikasi lulus"):
+  - Hapus `laravel-app/tests/Feature/legacy-sql/` (seluruh folder).
+  - Hapus Eloquent models yang tidak dibutuhkan: `Report.php`, `StatusLog.php`, `Kelurahan.php`, `Category.php` (pertahankan `User.php`).
+  - Hapus migrasi SQL di `database/migrations/` (kecuali yang dibutuhkan).
+  - Hapus `database/seeders/KelurahanLengkapSeeder.php`.
+  - Hapus referensi TiDB dari `config/database.php` (atau kurangi ke minimum).
+  - Verifikasi build Vercel tidak ada error.
+
+> PERINGATAN: Tahap 6 bersifat destruktif dan tidak dapat di-rollback tanpa git.
+> Konfirmasi eksplisit "verifikasi lulus" dari pengguna wajib sebelum dimulai.

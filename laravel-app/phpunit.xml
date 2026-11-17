@@ -9,7 +9,18 @@
             <directory>tests/Unit</directory>
         </testsuite>
         <testsuite name="Feature">
-            <directory>tests/Feature</directory>
+            <!-- Test Firebase baru (berbasis repository in-memory, tanpa SQL) -->
+            <file>tests/Feature/AuthApiTest.php</file>
+            <file>tests/Feature/UserApiTest.php</file>
+            <file>tests/Feature/ReportApiTest.php</file>
+            <file>tests/Feature/StatsApiTest.php</file>
+            <file>tests/Feature/KelurahanApiTest.php</file>
+            <file>tests/Feature/FirestoreSeedCommandTest.php</file>
+            <!--
+                Test lama (berbasis Eloquent/SQL) telah dipindahkan ke
+                tests/Feature/legacy-sql/ dan tidak dijalankan secara default.
+                Akan dihapus permanen pada Tahap 6 setelah "verifikasi lulus".
+            -->
         </testsuite>
     </testsuites>
     <source>
