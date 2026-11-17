@@ -103,3 +103,4 @@ class FirestoreUserRepositoryTest extends TestCase
         $this->assertEquals('PETUGAS', $result['role']);
     }
 }
+

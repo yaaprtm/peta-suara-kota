@@ -242,8 +242,9 @@ export function createSSEConnection(
   onNewReport: (report: unknown) => void,
   onStatusUpdate: (data: { reportId: string; newStatus: string }) => void
 ): EventSource {
-  const token = localStorage.getItem('accessToken');
-  const url = `${API_HOST}/api/reports/stream${token ? `?token=${token}` : ''}`;
+  // Tidak kirim token via URL (F04) — gunakan cookie sesi (same-origin).
+  // EventSource tidak mendukung custom header; sesi web sudah di-set saat login.
+  const url = `${API_HOST}/api/reports/stream`;
   const es = new EventSource(url);
 
   es.addEventListener('new_report', e => {

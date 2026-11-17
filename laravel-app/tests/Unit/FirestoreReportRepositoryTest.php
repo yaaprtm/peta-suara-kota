@@ -141,3 +141,4 @@ class FirestoreReportRepositoryTest extends TestCase
         $this->assertEquals(4, $result['upvotes_count']);
     }
 }
+

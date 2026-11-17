@@ -135,3 +135,4 @@ class AuthApiTest extends TestCase
         $afterLogoutResponse->assertStatus(401);
     }
 }
+

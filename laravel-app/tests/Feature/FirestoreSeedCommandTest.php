@@ -127,3 +127,4 @@ class FirestoreSeedCommandTest extends TestCase
         }
     }
 }
+

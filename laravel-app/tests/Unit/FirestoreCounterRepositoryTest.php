@@ -92,3 +92,4 @@ class FirestoreCounterRepositoryTest extends TestCase
         $this->assertCount(1, $density['density']);
     }
 }
+

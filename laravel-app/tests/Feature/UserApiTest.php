@@ -95,3 +95,4 @@ class UserApiTest extends TestCase
             ->assertJsonPath('message', 'Tidak dapat menonaktifkan akun sendiri.');
     }
 }
+

@@ -85,3 +85,4 @@ class FirestoreTokenRepositoryTest extends TestCase
         $this->assertTrue($this->repository->deleteToken($plaintext));
     }
 }
+
