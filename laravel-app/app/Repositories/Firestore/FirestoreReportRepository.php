@@ -373,3 +373,4 @@ class FirestoreReportRepository implements ReportRepositoryInterface
         return $this->client->deleteDocument(self::COLLECTION, $id);
     }
 }
+

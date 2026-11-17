@@ -4,7 +4,6 @@ namespace App\Auth;
 
 use App\Contracts\Repositories\KelurahanRepositoryInterface;
 use App\Contracts\Repositories\UserRepositoryInterface;
-use App\Models\Kelurahan;
 use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
@@ -40,10 +39,7 @@ class FirestoreUserProvider implements UserProvider
         if (!empty($data['kelurahan_id']) && $this->kelurahanRepository) {
             $kelData = $this->kelurahanRepository->findById((string) $data['kelurahan_id']);
             if ($kelData) {
-                $kel = new Kelurahan();
-                $kel->forceFill($kelData);
-                $kel->exists = true;
-                $user->setRelation('kelurahan', $kel);
+                $user->setRelation('kelurahan', (object) $kelData);
             }
         }
 
@@ -100,3 +96,4 @@ class FirestoreUserProvider implements UserProvider
         // No-op for now
     }
 }
+

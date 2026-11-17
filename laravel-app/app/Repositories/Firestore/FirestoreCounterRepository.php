@@ -353,3 +353,4 @@ class FirestoreCounterRepository implements CounterRepositoryInterface
         }
     }
 }
+

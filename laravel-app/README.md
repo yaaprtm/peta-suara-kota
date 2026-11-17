@@ -23,7 +23,7 @@ See [PERFORMANCE-OPTIMIZATION.md](./PERFORMANCE-OPTIMIZATION.md) and [OPTIMIZATI
 | Layer | Teknologi |
 |---|---|
 | Backend | Laravel 13, PHP 8.3, Eloquent ORM |
-| Database | TiDB Cloud (MySQL-compatible, port 4000, SSL/TLS) |
+| Database | Google Cloud Firestore (Firebase REST API) |
 | Frontend | React 18, Inertia.js v2, TypeScript, Tailwind CSS v3 |
 | Peta | Mapbox GL JS v3, GeoJSON 31 Kecamatan Surabaya |
 | State | Zustand v5 + LocalStorage persistence |
@@ -38,10 +38,10 @@ See [PERFORMANCE-OPTIMIZATION.md](./PERFORMANCE-OPTIMIZATION.md) and [OPTIMIZATI
 ## 🚀 Panduan Menjalankan Aplikasi (Lokal)
 
 ### 1. Prasyarat Sistem
-- PHP 8.3+ dengan ekstensi `pdo_mysql`, `gd`, `fileinfo`, `mbstring`
+- PHP 8.3+ dengan ekstensi `gd`, `fileinfo`, `mbstring`, `openssl`
 - Composer 2.x
 - Node.js 18+ & npm
-- MySQL 8.0+ lokal **atau** TiDB Cloud (production)
+- Google Cloud Firestore (Firebase)
 - Mapbox account (untuk peta interaktif)
 
 ### 2. Clone & Install
@@ -68,25 +68,23 @@ Edit `.env`:
 APP_NAME="Peta Suara Kota"
 APP_URL=http://localhost:8000
 
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=peta_suara_kota
-DB_USERNAME=root
-DB_PASSWORD=
+FIREBASE_DRIVER=firestore
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_DATABASE_ID=(default)
+FIREBASE_CREDENTIALS_PATH=C:\path\ke\serviceAccountKey.json
 
-SESSION_DRIVER=database
-CACHE_STORE=database
+SESSION_DRIVER=cookie
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
 
 VITE_APP_NAME="Peta Suara Kota"
 VITE_MAPBOX_TOKEN=pk.eyJ1...         # Diwajibkan untuk peta
 ```
 
-### 4. Migrasi & Seeding Demo
+### 4. Seeding Demo Firestore
 
 ```bash
-php artisan migrate
-php artisan db:seed
+php artisan firestore:seed
 ```
 
 Seeder akan membuat:
@@ -218,16 +216,15 @@ APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://your-app.vercel.app
 
-# TiDB Cloud — MySQL-compatible, port 4000, SSL otomatis aktif
-DB_CONNECTION=mysql
-DB_HOST=gateway01.ap-northeast-1.prod.aws.tidbcloud.com
-DB_PORT=4000
-DB_DATABASE=peta_suara_kota
-DB_USERNAME=your_tidb_username.root
-DB_PASSWORD=your_tidb_password
+# Firebase / Firestore
+FIREBASE_DRIVER=firestore
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_DATABASE_ID=(default)
+FIREBASE_CREDENTIALS_BASE64=your_base64_encoded_service_account_key
 
-SESSION_DRIVER=database
-CACHE_STORE=database
+SESSION_DRIVER=cookie
+CACHE_STORE=file
+QUEUE_CONNECTION=sync
 
 FILESYSTEM_DISK=s3
 AWS_ACCESS_KEY_ID=...
@@ -240,15 +237,11 @@ VITE_APP_NAME="Peta Suara Kota"
 VITE_MAPBOX_TOKEN=pk.eyJ1...
 ```
 
-3. **Jalankan migrasi setelah deploy pertama:**
+3. **Jalankan seed Firestore setelah deploy:**
 
 ```bash
-vercel env pull .env.local
-php artisan migrate --force
-php artisan db:seed --class=DatabaseSeeder
+php artisan firestore:seed
 ```
-
-Selengkapnya lihat [`PRODUCTION-CONFIG.md`](./PRODUCTION-CONFIG.md) dan [`STORAGE-SETUP.md`](./STORAGE-SETUP.md).
 
 ---
 
@@ -263,7 +256,7 @@ Selengkapnya lihat [`PRODUCTION-CONFIG.md`](./PRODUCTION-CONFIG.md) dan [`STORAG
    ┌───────────▼──────────┐  ┌────────▼────────────────┐
    │   Laravel Backend     │  │   React Frontend         │
    │   ─────────────────   │  │   ──────────────────     │
-   │   Eloquent ORM        │  │   Zustand Stores         │
+   │   Firestore Repos     │  │   Zustand Stores         │
    │   UrgencyScorer       │  │   Mapbox GL JS           │
    │   GeofenceValidator   │  │   i18n (ID/EN)           │
    │   StatusWorkflow      │  │   SSE real-time          │
@@ -271,9 +264,9 @@ Selengkapnya lihat [`PRODUCTION-CONFIG.md`](./PRODUCTION-CONFIG.md) dan [`STORAG
    └───────────┬──────────┘  └────────────────────────┘
                │
    ┌───────────▼──────────────────────────────────────┐
-   │             MySQL Database                        │
-   │  users · kelurahans · reports · status_logs       │
-   │  categories · sessions · cache                    │
+   │             Google Cloud Firestore               │
+   │  users · reports · counters                      │
+   │  (Kelurahan & Kategori disimpan di berkas lokal) │
    └──────────────────────────────────────────────────┘
 ```
 

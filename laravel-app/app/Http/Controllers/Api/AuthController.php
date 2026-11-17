@@ -7,7 +7,6 @@ use App\Contracts\Repositories\KelurahanRepositoryInterface;
 use App\Contracts\Repositories\TokenRepositoryInterface;
 use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Http\Controllers\Controller;
-use App\Models\Kelurahan;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,13 +41,11 @@ class AuthController extends Controller
         $user->forceFill($userData);
         $user->exists = true;
 
+        // Inject kelurahan sebagai array plain (bukan Eloquent relation)
         if (!empty($userData['kelurahan_id'])) {
             $kelData = $this->kelurahanRepository->findById((string) $userData['kelurahan_id']);
             if ($kelData) {
-                $kel = new Kelurahan();
-                $kel->forceFill($kelData);
-                $kel->exists = true;
-                $user->setRelation('kelurahan', $kel);
+                $user->setRelation('kelurahan', (object) $kelData);
             }
         }
 
@@ -61,18 +58,29 @@ class AuthController extends Controller
             $user = $this->toUserInstance($user);
         }
 
+        $kel = $user->relationLoaded('kelurahan') ? $user->getRelation('kelurahan') : null;
+        if (!$kel && !empty($user->kelurahan_id)) {
+            $kelData = $this->kelurahanRepository->findById((string) $user->kelurahan_id);
+            if ($kelData) {
+                $kel = (object) $kelData;
+            }
+        }
+        if (is_array($kel)) {
+            $kel = (object) $kel;
+        }
+
         return [
             'id'          => (string) $user->id,
             'email'       => $user->email,
             'name'        => $user->name,
             'role'        => $user->role,
             'phone'       => $user->phone,
-            'avatar'      => $user->avatar,
-            'kelurahan'   => $user->kelurahan ? [
-                'id'         => (string) $user->kelurahan->id,
-                'name'       => $user->kelurahan->name,
-                'kecamatan'  => $user->kelurahan->kecamatan,
-                'kota'       => $user->kelurahan->kota ?? 'Surabaya',
+            'avatar'      => $user->avatar ?? null,
+            'kelurahan'   => $kel ? [
+                'id'        => (string) ($kel->id ?? ''),
+                'name'      => $kel->name ?? '',
+                'kecamatan' => $kel->kecamatan ?? '',
+                'kota'      => $kel->kota ?? 'Surabaya',
             ] : null,
         ];
     }

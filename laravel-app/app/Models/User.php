@@ -2,31 +2,26 @@
 
 namespace App\Models;
 
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
+/**
+ * User model — dipertahankan sebagai Authenticatable untuk integrasi
+ * sesi Laravel (FirestoreUserProvider meng-hydrate instance ini dari
+ * data Firestore). Tidak terhubung ke tabel SQL mana pun.
+ */
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, HasUuids;
 
     /**
-     * The table associated with the model.
-     *
-     * @var string
+     * Nama tabel — tidak digunakan (Firestore), tapi diperlukan
+     * oleh Authenticatable contract agar tidak melempar error.
      */
     protected $table = 'users';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
         'email',
@@ -38,44 +33,24 @@ class User extends Authenticatable
         'is_active',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'is_active' => 'boolean',
+            'password'          => 'hashed',
+            'is_active'         => 'boolean',
         ];
     }
 
-    public function kelurahan(): BelongsTo
-    {
-        return $this->belongsTo(Kelurahan::class, 'kelurahan_id');
-    }
-
-    public function reports(): HasMany
-    {
-        return $this->hasMany(Report::class, 'user_id');
-    }
-
-    public function statusLogs(): HasMany
-    {
-        return $this->hasMany(StatusLog::class, 'changed_by_id');
-    }
+    // -------------------------------------------------------------------------
+    // Helper role (tidak ada relasi SQL — data kelurahan, reports, dll.
+    // diakses via repository Firestore, bukan Eloquent relation)
+    // -------------------------------------------------------------------------
 
     public function isWarga(): bool
     {

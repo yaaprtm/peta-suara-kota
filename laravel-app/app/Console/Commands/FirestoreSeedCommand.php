@@ -161,3 +161,4 @@ class FirestoreSeedCommand extends Command
         return self::SUCCESS;
     }
 }
+

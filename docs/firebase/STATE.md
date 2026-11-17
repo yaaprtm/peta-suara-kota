@@ -1,8 +1,8 @@
 # STATE MIGRASI FIREBASE
 
 ## 1. Tahap Saat Ini
-- **Tahap 5: Env, Vercel Config, dan CI (Selesai)**
-- Menunggu instruksi pengguna ("lanjut") untuk memulai **Tahap 6: Hapus Jejak TiDB**.
+- **Tahap 6: Hapus Jejak TiDB (Selesai — Seluruh Tahap Migrasi Selesai)**
+- Seluruh 6 tahap migrasi dari TiDB/MySQL ke Google Cloud Firestore telah berhasil diselesaikan secara penuh.
 
 ## 2. Riwayat dan Keputusan Arsitektur
 - **Branch**: `migrasi-firebase` (aktif).
@@ -14,8 +14,8 @@
 - **Session & Cache**: Driver sesi diubah ke `cookie`, cache ke `file`/`array`, queue ke `sync`. Tidak lagi membebani database SQL.
 - **Cache Header Data Publik**: Seluruh endpoint data peta publik (`/api/reports/viewport`, `/api/stats/*`, `/api/kelurahans`) memiliki header `Cache-Control` (`public, max-age=20, s-maxage=20`) untuk menghemat kuota Firestore secara drastis.
 
-## 3. Komponen yang Telah Selesai Dibuat (Tahap 1, 2, 3, 4, dan 5)
-1. **Fondasi & Client**:
+## 3. Komponen yang Telah Selesai Dibuat (Tahap 1 s/d 6)
+1. **Fondasi & Client (Tahap 1)**:
    - `FirestoreClientInterface` & `FirestoreRestClient`.
    - `StaticKelurahanRepository` & `StaticCategoryRepository`.
    - `InMemoryUserRepository`, `InMemoryTokenRepository`, `InMemoryCounterRepository`, `InMemoryReportRepository`.
@@ -36,19 +36,6 @@
      - `ReportController`: Beroperasi 100% via `ReportRepositoryInterface`, `KelurahanRepositoryInterface`, `CategoryRepositoryInterface`, `UserRepositoryInterface`.
      - `StatsController`: Beroperasi 100% via `CounterRepositoryInterface`.
      - `KelurahanController`: Beroperasi 100% via `KelurahanRepositoryInterface` dan `CounterRepositoryInterface`.
-4. **Pengujian Unit & Fitur**:
-   - `FirestoreRestClientTest`: 3 passed, 22 assertions.
-   - `InMemoryRepositoriesTest`: 5 passed, 45 assertions.
-   - `FirestoreUserRepositoryTest`: 4 passed, 16 assertions.
-   - `FirestoreTokenRepositoryTest`: 3 passed, 11 assertions.
-   - `FirestoreReportRepositoryTest`: 4 passed, 19 assertions.
-   - `FirestoreCounterRepositoryTest`: 4 passed, 16 assertions.
-   - `AuthApiTest`: 5 passed, 23 assertions.
-   - `UserApiTest`: 5 passed, 24 assertions.
-   - `ReportApiTest`: 7 passed, 35 assertions.
-   - `StatsApiTest`: 3 passed, 13 assertions.
-   - `KelurahanApiTest`: 3 passed, 14 assertions.
-   - Total Keseluruhan: 50 tests, 2.872 assertions (100% lulus tanpa kegagalan).
 4. **Seeder dan Import Data (Tahap 4)**:
    - `FirestoreSeedCommand` (`php artisan firestore:seed`):
      - Seed 5 akun demo ke Firestore (1 ADMIN, 2 PETUGAS, 2 WARGA).
@@ -65,25 +52,21 @@
      - Setelah semua laporan diimpor: panggil `counterRepository->recalculate()` untuk kalkulasi ulang global_stats, leaderboard, dan kecamatan_density.
      - Menulis langsung via `FirestoreClientInterface` (bypass counter increment di `FirestoreReportRepository::create()`) agar counter dikalkulasi sekali di akhir.
    - `FirestoreSeedCommandTest`: 6 passed, 29 assertions.
-   - Total Keseluruhan: **56 tests, 2.901 assertions (100% lulus)**.
 5. **Env, Vercel Config, dan CI (Tahap 5)**:
    - `laravel-app/.env.example`: ditambahkan blok Firebase (FIREBASE_DRIVER, FIREBASE_PROJECT_ID, FIREBASE_DATABASE_ID, FIREBASE_CREDENTIALS_PATH, FIREBASE_CREDENTIALS_BASE64, FIREBASE_EMULATOR_HOST). Komentar SESSION/CACHE/QUEUE diperbarui sesuai arsitektur cookie/file/sync.
    - `vercel.json`: ditambahkan blok `env` dengan referensi Vercel secret (@firebase_project_id, @firebase_database_id, @firebase_credentials_base64) dan override driver (SESSION_DRIVER=cookie, CACHE_STORE=file, QUEUE_CONNECTION=sync).
    - `laravel-app/phpunit.xml`: testsuite Feature diubah dari `<directory>` menjadi daftar file eksplisit (6 file Firebase). Test lama SQL tidak lagi dijalankan.
-   - `laravel-app/tests/Feature/legacy-sql/`: 9 file test lama (berbasis Eloquent/SQL) dipindahkan ke sini, belum dihapus (menunggu Tahap 6 "verifikasi lulus").
-   - Verifikasi: `php vendor/bin/phpunit` → **56 tests, 2.901 assertions, 0 kegagalan**.
+6. **Pembersihan Jejak TiDB (Tahap 6)**:
+   - Menghapus folder `tests/Feature/legacy-sql/` (9 file test lama SQL).
+   - Menghapus Eloquent models yang tidak terpakai: `Category.php`, `Kelurahan.php`, `Report.php`, `StatusLog.php`.
+   - Mempertahankan `User.php` sebagai contract `Authenticatable` murni untuk sesi Laravel (tanpa relasi Eloquent SQL).
+   - Menghapus folder `database/migrations/` (seluruh migrasi SQL dibersihkan).
+   - Menghapus `KelurahanLengkapSeeder.php` dan `E2ETestSeeder.php`. `DatabaseSeeder.php` dialihkan untuk mengarahkan pengguna ke `php artisan firestore:seed`.
+   - Membersihkan `config/database.php` (menghapus blok konfigurasi SSL TiDB khusus).
+   - Memperbarui dokumentasi (`README.md`, `.env.example`, `.env.production.example`, store frontend) untuk mencerminkan Firestore.
+   - Pengujian: Unit & Feature test suite **56 tests, 2.901 assertions (100% lulus)**.
+   - Build frontend: `npm run build` sukses 100% tanpa error.
 
 ## 4. Status Database TiDB
-- Konfigurasi TiDB di `.env` dan `config/database.php` masih utuh dan tidak dihapus sesuai aturan (dilarang menghapus kode TiDB sebelum Tahap 6).
-
-## 5. Langkah Berikutnya (Menunggu instruksi "lanjut")
-- **Tahap 6: Hapus Jejak TiDB** (HANYA setelah instruksi "verifikasi lulus"):
-  - Hapus `laravel-app/tests/Feature/legacy-sql/` (seluruh folder).
-  - Hapus Eloquent models yang tidak dibutuhkan: `Report.php`, `StatusLog.php`, `Kelurahan.php`, `Category.php` (pertahankan `User.php`).
-  - Hapus migrasi SQL di `database/migrations/` (kecuali yang dibutuhkan).
-  - Hapus `database/seeders/KelurahanLengkapSeeder.php`.
-  - Hapus referensi TiDB dari `config/database.php` (atau kurangi ke minimum).
-  - Verifikasi build Vercel tidak ada error.
-
-> PERINGATAN: Tahap 6 bersifat destruktif dan tidak dapat di-rollback tanpa git.
-> Konfirmasi eksplisit "verifikasi lulus" dari pengguna wajib sebelum dimulai.
+- Seluruh dependensi runtime ke TiDB telah dihapus.
+- Aplikasi sekarang 100% berjalan di atas Google Cloud Firestore (Firebase).

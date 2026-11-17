@@ -63,7 +63,7 @@ const initialTimeRange = {
 };
 
 export const useReportsStore = create<ReportsState>((set, get) => ({
-  // State awal kosong — data diambil dari TiDB Cloud via API
+  // State awal kosong — data diambil dari backend API (Firestore)
   reports: [],
   filteredReports: [],
   selectedReport: null,
@@ -200,7 +200,7 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
   },
 
   resetReports: () => {
-    // Reset ke array kosong — data akan di-fetch ulang dari TiDB Cloud
+    // Reset ke array kosong — data akan di-fetch ulang dari backend API (Firestore)
     set({ reports: [], filteredReports: [], selectedReport: null });
   },
 
