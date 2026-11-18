@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Link, router } from '@inertiajs/react';
 import {
   IconUser,
@@ -9,6 +9,7 @@ import {
   IconChevronRight,
   IconSparkles,
   IconBuildingCommunity,
+  IconExternalLink,
 } from '@tabler/icons-react';
 import { format, parseISO } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
@@ -20,11 +21,12 @@ import { UrgencyBadge, StatusBadge, CategoryBadge, Avatar } from '@/Components/u
 import ReportForm from '@/Components/reports/ReportForm';
 import LanguageToggle from '@/Components/ui/LanguageToggle';
 import { useTranslation } from '@/i18n/useTranslation';
+import LazyMapView from '@/Components/map/LazyMapView';
 
 const WargaDashboardPage: React.FC = () => {
   const navigate = (url: string) => router.visit(url);
   const { user } = useAuthStore();
-  const { reports, addReport } = useReportsStore();
+  const { reports, addReport, setSelectedReport } = useReportsStore();
   const { t } = useTranslation();
 
   const [activeTab, setActiveTab] = useState<'laporanku' | 'peta' | 'semua'>('laporanku');
@@ -32,6 +34,25 @@ const WargaDashboardPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ReportCategory | 'ALL'>('ALL');
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isPickingLocation, setIsPickingLocation] = useState(false);
+
+  const handleSelectReport = useCallback(
+    (report: Report) => {
+      setSelectedReport(report);
+    },
+    [setSelectedReport]
+  );
+
+  const handleMapClick = useCallback(
+    (latlng: { lat: number; lng: number }) => {
+      if (isPickingLocation) {
+        setPickedLocation(latlng);
+        setIsPickingLocation(false);
+        setShowCreateModal(true);
+      }
+    },
+    [isPickingLocation]
+  );
 
   const myReports = useMemo(() => {
     // FIX: hapus filter hardcode nama 'budi' — hanya tampilkan laporan milik user yang login
@@ -241,17 +262,26 @@ const WargaDashboardPage: React.FC = () => {
                   <h3 className="font-bold text-navy text-xs uppercase tracking-wider">{t('dashboard.mapTitle')}</h3>
                   <p className="text-[11px] text-slate-500">{t('dashboard.mapSubtitle')}</p>
                 </div>
-                <span className="text-xs font-mono text-slate-500">
-                  {t('dashboard.mapPoints', { count: reports.length })}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-slate-500">
+                    {t('dashboard.mapPoints', { count: reports.length })}
+                  </span>
+                  <button
+                    onClick={() => navigate('/peta')}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-orange hover:text-orange-600 transition-colors"
+                    title="Buka peta penuh"
+                  >
+                    <IconExternalLink className="w-3.5 h-3.5" />
+                    <span>Peta Penuh</span>
+                  </button>
+                </div>
               </div>
               <div className="h-[520px] rounded-xl overflow-hidden border border-slate-200 bg-slate-100 relative">
-                <iframe
-                  title={t('dashboard.mapIframeTitle')}
-                  width="100%"
-                  height="100%"
-                  frameBorder="0"
-                  src="https://www.openstreetmap.org/export/embed.html?bbox=112.65%2C-7.35%2C112.82%2C-7.20&layer=mapnik"
+                <LazyMapView
+                  onSelectReport={handleSelectReport}
+                  onMapClick={handleMapClick}
+                  isPickingLocation={isPickingLocation}
+                  pickedLocation={pickedLocation}
                 />
               </div>
             </div>
