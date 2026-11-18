@@ -275,8 +275,10 @@ class ReportController extends Controller
         $photoPaths = [];
         if ($request->hasFile('photos')) {
             try {
+                $rawPhotos = $request->file('photos');
+                $photoList = is_array($rawPhotos) ? $rawPhotos : [$rawPhotos];
                 $photoPaths = StorageService::storeFiles(
-                    $request->file('photos'),
+                    $photoList,
                     'photos',
                     'public'
                 );

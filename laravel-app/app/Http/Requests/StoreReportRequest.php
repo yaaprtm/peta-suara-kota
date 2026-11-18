@@ -14,6 +14,13 @@ class StoreReportRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        if ($this->hasFile('photos')) {
+            $photos = $this->file('photos');
+            if (!is_array($photos)) {
+                $this->files->set('photos', [$photos]);
+            }
+        }
+
         if (!$this->has('category') && $this->filled('categoryId')) {
             $catRepo = app(CategoryRepositoryInterface::class);
             $categories = $catRepo->all();
@@ -37,7 +44,7 @@ class StoreReportRequest extends FormRequest
             'address' => ['nullable', 'string', 'max:500'],
             'kelurahanId' => ['nullable', 'string'],
             'audioTranscript' => ['nullable', 'string'],
-            'photos' => ['nullable', 'array', 'max:4'],
+            'photos' => ['nullable'],
             'photos.*' => ['file', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
             'audio' => ['nullable', 'file', 'mimes:mp3,wav,ogg,m4a,webm', 'max:10240'],
         ];

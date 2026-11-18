@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   IconUpload,
   IconMicrophone,
@@ -247,7 +247,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
       if (address) formData.append('address', address.trim());
       if (audioTranscript) formData.append('audioTranscript', audioTranscript);
       photos.forEach((photo) => {
-        formData.append('photos', photo);
+        formData.append('photos[]', photo);
       });
 
       // Kirim ke backend â€” jika gagal, lempar error ke user (jangan swallow)
