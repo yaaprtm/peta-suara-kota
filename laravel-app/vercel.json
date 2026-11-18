@@ -75,9 +75,10 @@
     "APP_ENV": "production",
     "APP_DEBUG": "false",
     "LOG_CHANNEL": "stderr",
-    "SESSION_DRIVER": "database",
-    "CACHE_STORE": "database",
-    "QUEUE_CONNECTION": "sync",
-    "FILESYSTEM_DISK": "s3"
+    "FIREBASE_DRIVER": "firestore",
+    "FIREBASE_DATABASE_ID": "(default)",
+    "SESSION_DRIVER": "cookie",
+    "CACHE_STORE": "file",
+    "QUEUE_CONNECTION": "sync"
   }
 }
