@@ -11,12 +11,14 @@ import {
   IconCircleDot,
   IconX,
   Icon3dCubeSphere,
+  IconDeviceCctv,
 } from '@tabler/icons-react';
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
 import { createPinElement, PIN_STYLE } from './markers/createPin';
 import { fetchKecamatanGeoJSON, getKecamatanBounds } from '../../lib/kecamatan';
 import { statsApi } from '../../lib/api';
+import CctvModal, { CctvItem } from './CctvModal';
 
 // ─── Mapbox Access Token Setup & Validation ───────────────────────────────────
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -134,6 +136,34 @@ function debounce<T extends (...args: any[]) => void>(fn: T, ms: number) {
   };
 }
 
+// ─── Helper: Buat elemen pin CCTV dengan animasi pulsa ─────────────────────────
+function createCctvPinElement(cctv: CctvItem, onClick: () => void): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'cctv-pin-marker cursor-pointer select-none';
+  el.title = `${cctv.name} (${cctv.district}) - Klik untuk pantau CCTV`;
+
+  el.innerHTML = `
+    <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+      <div style="position: absolute; inset: 0; border-radius: 9999px; background: rgba(0, 255, 136, 0.35); animation: ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+      <div style="position: relative; width: 28px; height: 28px; border-radius: 9999px; background: #0d1117; border: 2px solid #00ff88; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px rgba(0, 255, 136, 0.7); transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 10h18a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Z"/>
+          <path d="m20 13 3-2v6l-3-2"/>
+          <circle cx="7" cy="14" r="1.5"/>
+        </svg>
+      </div>
+      <div style="position: absolute; top: 1px; right: 1px; width: 8px; height: 8px; border-radius: 9999px; background: #00ff88; border: 1.5px solid #0d1117; box-shadow: 0 0 6px #00ff88;"></div>
+    </div>
+  `;
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+
+  return el;
+}
+
 // ─── MapView Props ─────────────────────────────────────────────────────────────
 interface MapViewProps {
   onSelectReport: (report: Report) => void;
@@ -166,6 +196,12 @@ const MapView: React.FC<MapViewProps> = ({
 
   const [is3DMode, setIs3DMode] = useState(false);
   const is3DModeRef = useRef(false);
+
+  const [isCctvMode, setIsCctvMode] = useState(false);
+  const isCctvModeRef = useRef(false);
+  const [cctvData, setCctvData] = useState<CctvItem[]>([]);
+  const [selectedCctv, setSelectedCctv] = useState<CctvItem | null>(null);
+  const cctvMarkersRef = useRef<mapboxgl.Marker[]>([]);
 
   const [densityData, setDensityData] = useState<KecamatanDensityItem[]>([]);
   const [maxDensity, setMaxDensity] = useState(1);
@@ -736,6 +772,8 @@ const MapView: React.FC<MapViewProps> = ({
     return () => {
       markersOnScreenRef.current.forEach((m) => m.remove());
       markersOnScreenRef.current.clear();
+      cctvMarkersRef.current.forEach((m) => m.remove());
+      cctvMarkersRef.current = [];
       map.remove();
       mapRef.current = null;
     };
@@ -999,6 +1037,67 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, [is3DMode, setAtmosphereFog]);
 
+  const removeCctvMarkers = useCallback(() => {
+    cctvMarkersRef.current.forEach((m) => m.remove());
+    cctvMarkersRef.current = [];
+  }, []);
+
+  const addCctvMarkers = useCallback(
+    (data: CctvItem[]) => {
+      const map = mapRef.current;
+      if (!map) return;
+      removeCctvMarkers();
+      data.forEach((cctv) => {
+        const el = createCctvPinElement(cctv, () => {
+          setSelectedCctv(cctv);
+          map.flyTo({
+            center: [cctv.lng, cctv.lat],
+            zoom: Math.max(map.getZoom(), 15.5),
+            duration: 700,
+          });
+        });
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([cctv.lng, cctv.lat])
+          .addTo(map);
+        cctvMarkersRef.current.push(marker);
+      });
+    },
+    [removeCctvMarkers]
+  );
+
+  const handleToggleCctv = useCallback(async () => {
+    const next = !isCctvMode;
+    setIsCctvMode(next);
+    isCctvModeRef.current = next;
+
+    if (next) {
+      let items = cctvData;
+      if (items.length === 0) {
+        try {
+          const res = await fetch('/data/cctv-surabaya.json');
+          items = await res.json();
+          setCctvData(items);
+        } catch (err) {
+          console.error('Failed to load CCTV data:', err);
+        }
+      }
+      addCctvMarkers(items);
+    } else {
+      removeCctvMarkers();
+    }
+  }, [isCctvMode, cctvData, addCctvMarkers, removeCctvMarkers]);
+
+  const handleViewReportsNearCctv = useCallback((cctv: CctvItem) => {
+    setSelectedCctv(null);
+    if (mapRef.current) {
+      mapRef.current.flyTo({
+        center: [cctv.lng, cctv.lat],
+        zoom: 16.5,
+        duration: 800,
+      });
+    }
+  }, []);
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="relative w-full h-full">
@@ -1067,6 +1166,21 @@ const MapView: React.FC<MapViewProps> = ({
         >
           <IconChartBar className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
           <span>Choropleth{isChoroplethMode ? ' ✓' : ''}</span>
+        </button>
+
+        {/* CCTV toggle */}
+        <button
+          type="button"
+          onClick={handleToggleCctv}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-sans font-medium active:translate-y-[1px] transition-all select-none shadow-xs ${
+            isCctvMode
+              ? 'bg-[#002b1b] text-[#00ff88] border-[#00ff88] font-bold shadow-[0_0_8px_rgba(0,255,136,0.35)]'
+              : 'bg-paper-white text-ink border-ink hover:bg-paper-kraft'
+          }`}
+          title="Layer CCTV — Titik kamera CCTV pantauan lalu lintas Surabaya"
+        >
+          <IconDeviceCctv className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+          <span>CCTV{isCctvMode ? ' Aktif' : ''}</span>
         </button>
       </div>
 
@@ -1154,6 +1268,15 @@ const MapView: React.FC<MapViewProps> = ({
       <div className="absolute bottom-3 right-3 z-[10] hidden sm:block px-2.5 py-1 bg-paper-white/95 border border-ink text-[10px] font-mono text-ink/80 select-none shadow-sm pointer-events-none">
         Batas Wilayah: Pemkot Surabaya (Satu Data / Perwali No. 26/2023)
       </div>
+
+      {/* ── CCTV Modal Detail & Live Stream ── */}
+      {selectedCctv && (
+        <CctvModal
+          cctv={selectedCctv}
+          onClose={() => setSelectedCctv(null)}
+          onViewReports={handleViewReportsNearCctv}
+        />
+      )}
     </div>
   );
 };
