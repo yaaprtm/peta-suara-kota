@@ -358,7 +358,7 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, []);
 
-  // ─── 3D Extruded Buildings Layer (Detailed Shading & Height Fallback) ──────
+  // ─── 3D Extruded Buildings Layer (Realistic Indonesian Architectural Colors) ──
   const add3DBuildingsLayer = useCallback((map: mapboxgl.Map) => {
     if (!map.getSource('composite')) return;
     if (map.getLayer('3d-buildings')) return;
@@ -371,6 +371,8 @@ const MapView: React.FC<MapViewProps> = ({
         break;
       }
     }
+
+    const isSat = mapStyleRef.current === 'satelit';
 
     map.addLayer(
       {
@@ -385,20 +387,41 @@ const MapView: React.FC<MapViewProps> = ({
         },
         paint: {
           'fill-extrusion-color': [
-            'interpolate',
-            ['linear'],
-            ['coalesce', ['get', 'height'], ['*', ['get', 'building:levels'], 3.2], ['*', ['get', 'levels'], 3.2], 8],
-            0,
-            '#f1f5f9',
-            15,
-            '#e2e8f0',
-            35,
-            '#cbd5e1',
-            75,
-            '#94a3b8',
-            150,
-            '#475569',
-          ],
+            'case',
+            // 1. Kategori tipe spesifik bangunan OpenStreetMap jika ada
+            ['in', ['get', 'type'], ['literal', ['residential', 'house', 'apartments', 'detached', 'terrace', 'home']]],
+            '#C86146', // Genteng merah bata khas perumahan Surabaya
+            ['in', ['get', 'type'], ['literal', ['commercial', 'office']]],
+            [
+              'case',
+              ['>=', ['coalesce', ['get', 'height'], 0], 35],
+              '#3B7EA1', // Menara perkantoran modern kaca biru
+              '#D4C4B5', // Ruko / kantor sedang warm sandstone
+            ],
+            ['in', ['get', 'type'], ['literal', ['retail', 'supermarket', 'mall']]],
+            '#788A9C', // Mall & pusat perbelanjaan metal stone
+            ['in', ['get', 'type'], ['literal', ['hospital', 'clinic']]],
+            '#3FA796', // Rumah sakit / fasilitas medis teal clean
+            ['in', ['get', 'type'], ['literal', ['school', 'university', 'kindergarten', 'college']]],
+            '#D97C38', // Sekolah / kampus batu bata oranye hangat
+            ['in', ['get', 'type'], ['literal', ['industrial', 'warehouse']]],
+            '#8E9DAE', // Pabrik / pergudangan plat baja perak
+            ['in', ['get', 'type'], ['literal', ['mosque', 'place_of_worship']]],
+            '#2E7D32', // Tempat ibadah kubah hijau
+
+            // 2. Fallback cerdas berdasarkan ketinggian bangunan di Surabaya:
+            [
+              'interpolate',
+              ['linear'],
+              ['coalesce', ['get', 'height'], ['*', ['get', 'building:levels'], 3.2], ['*', ['get', 'levels'], 3.2], 8],
+              0,   '#C86146', // < 12m: Rumah warga genteng merah bata terracotta
+              12,  '#B8553C', // 12m (3-4 lantai): Ruko & perumahan padat genteng bata
+              20,  '#D4C2AF', // 20m (5-7 lantai): Gedung sedang krem sandstone
+              35,  '#5B8CB5', // 35m (10+ lantai): Menara kaca biru
+              65,  '#356D9B', // 65m (20 lantai): Pencakar langit biru laut
+              120, '#1E4C75', // 120m+ (Skyscraper): Deep Navy Blue Glass (seperti TP / Pakuwon)
+            ],
+          ] as any,
           'fill-extrusion-height': [
             'interpolate',
             ['linear'],
@@ -417,7 +440,7 @@ const MapView: React.FC<MapViewProps> = ({
             13.5,
             ['coalesce', ['get', 'min_height'], 0],
           ],
-          'fill-extrusion-opacity': 0.9,
+          'fill-extrusion-opacity': isSat ? 0.38 : 0.92,
           'fill-extrusion-vertical-gradient': true,
         },
       },
@@ -937,6 +960,9 @@ const MapView: React.FC<MapViewProps> = ({
     }
     if (map.getLayer('kecamatan-border')) {
       map.setPaintProperty('kecamatan-border', 'line-color', next === 'satelit' ? '#FAF6EE' : '#B8AC94');
+    }
+    if (map.getLayer('3d-buildings')) {
+      map.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', next === 'satelit' ? 0.38 : 0.92);
     }
   }, [mapStyle]);
 
