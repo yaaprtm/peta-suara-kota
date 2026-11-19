@@ -312,17 +312,20 @@ const MapView: React.FC<MapViewProps> = ({
     if (mapRef.current) mapRef.current.getCanvas().style.cursor = '';
   }, []);
 
-  // ─── High-Res Real Satellite Layer (Esri World Imagery) ─────────────────────
+  // ─── Ultra-HD Real Satellite Layer (Retina / 2x High-DPI Tiles) ─────────────
   const addSatelliteLayer = useCallback((map: mapboxgl.Map) => {
     if (!map.getSource('satellite-source')) {
       map.addSource('satellite-source', {
         type: 'raster',
         tiles: [
-          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          'https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}&scale=2',
+          'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}&scale=2',
+          'https://mt2.google.com/vt/lyrs=s&x={x}&y={y}&z={z}&scale=2',
+          'https://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}&scale=2',
         ],
         tileSize: 256,
-        maxzoom: 19,
-        attribution: 'Esri World Imagery',
+        maxzoom: 20,
+        attribution: 'Google Satellite',
       });
     }
 
@@ -346,7 +349,8 @@ const MapView: React.FC<MapViewProps> = ({
           },
           paint: {
             'raster-opacity': 1.0,
-            'raster-fade-duration': 300,
+            'raster-resampling': 'linear',
+            'raster-fade-duration': 200,
           },
         },
         beforeId
@@ -354,7 +358,7 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, []);
 
-  // ─── 3D Extruded Buildings Layer ───────────────────────────────────────────
+  // ─── 3D Extruded Buildings Layer (Detailed Shading & Height Fallback) ──────
   const add3DBuildingsLayer = useCallback((map: mapboxgl.Map) => {
     if (!map.getSource('composite')) return;
     if (map.getLayer('3d-buildings')) return;
@@ -373,9 +377,9 @@ const MapView: React.FC<MapViewProps> = ({
         id: '3d-buildings',
         source: 'composite',
         'source-layer': 'building',
-        filter: ['==', 'extrude', 'true'],
+        filter: ['any', ['==', 'extrude', 'true'], ['has', 'height'], ['has', 'levels'], ['has', 'building:levels']],
         type: 'fill-extrusion',
-        minzoom: 13,
+        minzoom: 12,
         layout: {
           visibility: is3DModeRef.current ? 'visible' : 'none',
         },
@@ -383,35 +387,38 @@ const MapView: React.FC<MapViewProps> = ({
           'fill-extrusion-color': [
             'interpolate',
             ['linear'],
-            ['get', 'height'],
+            ['coalesce', ['get', 'height'], ['*', ['get', 'building:levels'], 3.2], ['*', ['get', 'levels'], 3.2], 8],
             0,
+            '#f1f5f9',
+            15,
+            '#e2e8f0',
+            35,
             '#cbd5e1',
-            20,
+            75,
             '#94a3b8',
-            50,
-            '#64748b',
-            100,
-            '#334155',
+            150,
+            '#475569',
           ],
           'fill-extrusion-height': [
             'interpolate',
             ['linear'],
             ['zoom'],
-            13,
+            12,
             0,
-            14.5,
-            ['get', 'height'],
+            13.5,
+            ['coalesce', ['get', 'height'], ['*', ['get', 'building:levels'], 3.2], ['*', ['get', 'levels'], 3.2], 8],
           ],
           'fill-extrusion-base': [
             'interpolate',
             ['linear'],
             ['zoom'],
-            13,
+            12,
             0,
-            14.5,
-            ['get', 'min_height'],
+            13.5,
+            ['coalesce', ['get', 'min_height'], 0],
           ],
-          'fill-extrusion-opacity': 0.85,
+          'fill-extrusion-opacity': 0.9,
+          'fill-extrusion-vertical-gradient': true,
         },
       },
       labelLayerId
@@ -675,6 +682,16 @@ const MapView: React.FC<MapViewProps> = ({
     map.addControl(new mapboxgl.NavigationControl({ showCompass: true, visualizePitch: true }), 'top-right');
 
     map.on('style.load', () => {
+      try {
+        map.setLight({
+          anchor: 'viewport',
+          color: '#ffffff',
+          intensity: 0.55,
+          position: [1.5, 180, 50],
+        });
+      } catch {
+        /* ignore */
+      }
       addSatelliteLayer(map);
       add3DBuildingsLayer(map);
       addKecamatanLayers(map);
@@ -932,9 +949,11 @@ const MapView: React.FC<MapViewProps> = ({
     if (!map) return;
 
     if (next) {
+      const currentZoom = map.getZoom();
       map.easeTo({
         pitch: 62,
         bearing: -18,
+        zoom: currentZoom < 14.8 ? 15.2 : currentZoom,
         duration: 1200,
       });
       setAtmosphereFog(map, true);
