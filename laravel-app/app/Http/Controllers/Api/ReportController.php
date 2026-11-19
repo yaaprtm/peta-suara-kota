@@ -9,9 +9,9 @@ use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreReportRequest;
 use App\Http\Requests\UpdateReportStatusRequest;
+use App\Services\Firebase\FirebaseStorageService;
 use App\Services\GeofenceValidator;
 use App\Services\StatusWorkflowManager;
-use App\Services\StorageService;
 use App\Services\UrgencyScorer;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -271,19 +271,17 @@ class ReportController extends Controller
 
         $detectedKecamatan = $validation['kecamatan'];
 
-        // Upload foto
+        // Upload foto ke Firebase Storage
         $photoPaths = [];
         if ($request->hasFile('photos')) {
             try {
                 $rawPhotos = $request->file('photos');
                 $photoList = is_array($rawPhotos) ? $rawPhotos : [$rawPhotos];
-                $photoPaths = StorageService::storeFiles(
-                    $photoList,
-                    'photos',
-                    'public'
-                );
+                $storageService = new FirebaseStorageService();
+                $photoPaths = $storageService->uploadMany($photoList, 'photos');
             } catch (\Throwable $e) {
-                error_log('Photo upload failed: ' . $e->getMessage());
+                error_log('Firebase Storage photo upload failed: ' . $e->getMessage());
+                // Foto tidak kritis — laporan tetap disimpan tanpa foto
             }
         }
 
@@ -408,12 +406,16 @@ class ReportController extends Controller
         if ($newStatus === 'SELESAI') {
             $compPhotos = $report['completion_photos'] ?? [];
             if ($request->hasFile('completion_photos')) {
-                $newPhotos = StorageService::storeFiles(
-                    $request->file('completion_photos'),
-                    'photos',
-                    'public'
-                );
-                $compPhotos = array_merge($compPhotos, $newPhotos);
+                try {
+                    $storageService = new FirebaseStorageService();
+                    $newPhotos = $storageService->uploadMany(
+                        $request->file('completion_photos'),
+                        'photos'
+                    );
+                    $compPhotos = array_merge($compPhotos, $newPhotos);
+                } catch (\Throwable $e) {
+                    error_log('Firebase Storage completion_photos upload failed: ' . $e->getMessage());
+                }
             }
 
             $completionData = [

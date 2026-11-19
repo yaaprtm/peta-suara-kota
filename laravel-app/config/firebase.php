@@ -37,6 +37,15 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Firebase Storage Bucket
+    |--------------------------------------------------------------------------
+    | Default: {project_id}.appspot.com
+    | Firebase Storage digunakan untuk menyimpan foto laporan.
+    */
+    'storage_bucket' => env('FIREBASE_STORAGE_BUCKET', env('FIREBASE_PROJECT_ID', 'patrol-f0ab5') . '.appspot.com'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Firestore Driver / Repository Mode
     |--------------------------------------------------------------------------
     | 'firestore' untuk koneksi ke Firestore / Emulator.
