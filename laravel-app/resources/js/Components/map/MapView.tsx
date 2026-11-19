@@ -13,6 +13,7 @@ import {
   Icon3dCubeSphere,
   IconDeviceCctv,
   IconDroplet,
+  IconShip,
 } from '@tabler/icons-react';
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
@@ -21,6 +22,7 @@ import { fetchKecamatanGeoJSON, getKecamatanBounds } from '../../lib/kecamatan';
 import { statsApi } from '../../lib/api';
 import CctvModal, { CctvItem } from './CctvModal';
 import WaterSensorModal, { WaterPumpItem } from './WaterSensorModal';
+import ShipModal, { ShipItem } from './ShipModal';
 import TacticalCommandBar from './TacticalCommandBar';
 
 // ─── Mapbox Access Token Setup & Validation ───────────────────────────────────
@@ -197,6 +199,35 @@ function createWaterPumpPinElement(pump: WaterPumpItem, onClick: () => void): HT
   return el;
 }
 
+// ─── Helper: Buat elemen pin Kapal / Radar Maritim AIS ─────────────────────────
+function createShipPinElement(ship: ShipItem, onClick: () => void): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'ship-pin-marker cursor-pointer select-none';
+  el.title = `${ship.name} (${ship.type.toUpperCase()}) - Haluan: ${ship.courseDeg}° - SOG: ${ship.speedKnots}kt`;
+
+  const isUnderway = ship.status === 'underway';
+  const color = isUnderway ? '#00ffaa' : '#38bdf8';
+
+  el.innerHTML = `
+    <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+      <div style="position: absolute; inset: 0; border-radius: 9999px; background: ${color}25; animation: ping 3s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+      <div style="position: relative; width: 28px; height: 28px; border-radius: 9999px; background: #05141c; border: 2px solid ${color}; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px ${color}80; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="${color}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(${ship.courseDeg}deg); transition: transform 0.3s ease;">
+          <polygon points="12 2 19 21 12 17 5 21 12 2"/>
+        </svg>
+      </div>
+      <div style="position: absolute; top: 1px; right: 1px; width: 8px; height: 8px; border-radius: 9999px; background: ${color}; border: 1.5px solid #05141c; box-shadow: 0 0 6px ${color};"></div>
+    </div>
+  `;
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+
+  return el;
+}
+
 // ─── MapView Props ─────────────────────────────────────────────────────────────
 interface MapViewProps {
   onSelectReport: (report: Report) => void;
@@ -241,6 +272,12 @@ const MapView: React.FC<MapViewProps> = ({
   const [pumpData, setPumpData] = useState<WaterPumpItem[]>([]);
   const [selectedPump, setSelectedPump] = useState<WaterPumpItem | null>(null);
   const pumpMarkersRef = useRef<mapboxgl.Marker[]>([]);
+
+  const [isShipMode, setIsShipMode] = useState(false);
+  const isShipModeRef = useRef(false);
+  const [shipData, setShipData] = useState<ShipItem[]>([]);
+  const [selectedShip, setSelectedShip] = useState<ShipItem | null>(null);
+  const shipMarkersRef = useRef<mapboxgl.Marker[]>([]);
 
   const [densityData, setDensityData] = useState<KecamatanDensityItem[]>([]);
   const [maxDensity, setMaxDensity] = useState(1);
@@ -815,6 +852,8 @@ const MapView: React.FC<MapViewProps> = ({
       cctvMarkersRef.current = [];
       pumpMarkersRef.current.forEach((m) => m.remove());
       pumpMarkersRef.current = [];
+      shipMarkersRef.current.forEach((m) => m.remove());
+      shipMarkersRef.current = [];
       map.remove();
       mapRef.current = null;
     };
@@ -1200,6 +1239,67 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, []);
 
+  const removeShipMarkers = useCallback(() => {
+    shipMarkersRef.current.forEach((m) => m.remove());
+    shipMarkersRef.current = [];
+  }, []);
+
+  const addShipMarkers = useCallback(
+    (data: ShipItem[]) => {
+      const map = mapRef.current;
+      if (!map) return;
+      removeShipMarkers();
+      data.forEach((ship) => {
+        const el = createShipPinElement(ship, () => {
+          setSelectedShip(ship);
+          map.flyTo({
+            center: [ship.lng, ship.lat],
+            zoom: Math.max(map.getZoom(), 14.8),
+            duration: 700,
+          });
+        });
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([ship.lng, ship.lat])
+          .addTo(map);
+        shipMarkersRef.current.push(marker);
+      });
+    },
+    [removeShipMarkers]
+  );
+
+  const handleToggleShip = useCallback(async () => {
+    const next = !isShipMode;
+    setIsShipMode(next);
+    isShipModeRef.current = next;
+
+    if (next) {
+      let items = shipData;
+      if (items.length === 0) {
+        try {
+          const res = await fetch('/data/maritime-surabaya.json');
+          items = await res.json();
+          setShipData(items);
+        } catch (err) {
+          console.error('Failed to load maritime data:', err);
+        }
+      }
+      addShipMarkers(items);
+    } else {
+      removeShipMarkers();
+    }
+  }, [isShipMode, shipData, addShipMarkers, removeShipMarkers]);
+
+  const handleFocusShip = useCallback((ship: ShipItem) => {
+    setSelectedShip(null);
+    if (mapRef.current) {
+      mapRef.current.flyTo({
+        center: [ship.lng, ship.lat],
+        zoom: 16,
+        duration: 800,
+      });
+    }
+  }, []);
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="relative w-full h-full">
@@ -1210,6 +1310,7 @@ const MapView: React.FC<MapViewProps> = ({
         reports={filteredReports}
         cctvCount={40}
         pumpCount={20}
+        shipCount={15}
         onSelectReport={(r) => onSelectReportRef.current(r)}
       />
 
@@ -1306,6 +1407,21 @@ const MapView: React.FC<MapViewProps> = ({
         >
           <IconDroplet className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
           <span>Pompa Air{isPumpMode ? ' Aktif' : ''}</span>
+        </button>
+
+        {/* Radar Maritim AIS toggle */}
+        <button
+          type="button"
+          onClick={handleToggleShip}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-sans font-medium active:translate-y-[1px] transition-all select-none shadow-xs ${
+            isShipMode
+              ? 'bg-[#051c14] text-[#00ffaa] border-[#00ffaa] font-bold shadow-[0_0_8px_rgba(0,255,170,0.35)]'
+              : 'bg-paper-white text-ink border-ink hover:bg-paper-kraft'
+          }`}
+          title="Radar Maritim & Transponder AIS — Pantauan posisi kapal Pelabuhan Tanjung Perak & Selat Madura"
+        >
+          <IconShip className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+          <span>Radar Kapal{isShipMode ? ' Aktif' : ''}</span>
         </button>
       </div>
 
@@ -1409,6 +1525,15 @@ const MapView: React.FC<MapViewProps> = ({
           pump={selectedPump}
           onClose={() => setSelectedPump(null)}
           onViewReports={handleViewReportsNearPump}
+        />
+      )}
+
+      {/* ── Maritime Vessel Modal ── */}
+      {selectedShip && (
+        <ShipModal
+          ship={selectedShip}
+          onClose={() => setSelectedShip(null)}
+          onFocusShip={handleFocusShip}
         />
       )}
     </div>

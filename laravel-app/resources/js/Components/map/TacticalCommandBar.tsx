@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Video, Droplets, Bell, ChevronUp, ChevronDown } from 'lucide-react';
+import { ShieldCheck, Video, Droplets, Bell, Anchor, ChevronUp, ChevronDown } from 'lucide-react';
 import { Report } from '../../types';
 
 interface TacticalCommandBarProps {
     reports: Report[];
     cctvCount?: number;
     pumpCount?: number;
+    shipCount?: number;
     onSelectReport?: (report: Report) => void;
 }
 
@@ -13,6 +14,7 @@ const TacticalCommandBar: React.FC<TacticalCommandBarProps> = ({
     reports,
     cctvCount = 40,
     pumpCount = 20,
+    shipCount = 15,
     onSelectReport,
 }) => {
     const [currentTime, setCurrentTime] = useState<string>('');
@@ -149,6 +151,19 @@ const TacticalCommandBar: React.FC<TacticalCommandBarProps> = ({
                 >
                     <Droplets size={11} />
                     <span>{pumpCount} POMPA</span>
+                </div>
+
+                <div
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold"
+                    style={{
+                        background: 'rgba(0, 255, 170, 0.1)',
+                        border: '1px solid rgba(0, 255, 170, 0.3)',
+                        color: '#00ffaa',
+                    }}
+                    title="Radar Transponder AIS Kapal Selat Madura & Tanjung Perak"
+                >
+                    <Anchor size={11} />
+                    <span>{shipCount} KAPAL</span>
                 </div>
 
                 <div
