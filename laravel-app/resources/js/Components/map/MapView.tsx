@@ -10,6 +10,7 @@ import {
   IconChartBar,
   IconCircleDot,
   IconX,
+  Icon3dCubeSphere,
 } from '@tabler/icons-react';
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
@@ -163,6 +164,9 @@ const MapView: React.FC<MapViewProps> = ({
   const [isChoroplethMode, setIsChoroplethMode] = useState(false);
   const isChoroplethModeRef = useRef(false);
 
+  const [is3DMode, setIs3DMode] = useState(false);
+  const is3DModeRef = useRef(false);
+
   const [densityData, setDensityData] = useState<KecamatanDensityItem[]>([]);
   const [maxDensity, setMaxDensity] = useState(1);
   const densityLoadedRef = useRef(false);
@@ -306,6 +310,132 @@ const MapView: React.FC<MapViewProps> = ({
 
   const handleMouseLeave = useCallback(() => {
     if (mapRef.current) mapRef.current.getCanvas().style.cursor = '';
+  }, []);
+
+  // ─── High-Res Real Satellite Layer (Esri World Imagery) ─────────────────────
+  const addSatelliteLayer = useCallback((map: mapboxgl.Map) => {
+    if (!map.getSource('satellite-source')) {
+      map.addSource('satellite-source', {
+        type: 'raster',
+        tiles: [
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        ],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: 'Esri World Imagery',
+      });
+    }
+
+    if (!map.getLayer('satellite-layer')) {
+      const layers = map.getStyle().layers || [];
+      let beforeId: string | undefined;
+      for (const l of layers) {
+        if (l.type === 'line' || l.type === 'symbol' || l.id === 'kecamatan-fill') {
+          beforeId = l.id;
+          break;
+        }
+      }
+
+      map.addLayer(
+        {
+          id: 'satellite-layer',
+          type: 'raster',
+          source: 'satellite-source',
+          layout: {
+            visibility: mapStyleRef.current === 'satelit' ? 'visible' : 'none',
+          },
+          paint: {
+            'raster-opacity': 1.0,
+            'raster-fade-duration': 300,
+          },
+        },
+        beforeId
+      );
+    }
+  }, []);
+
+  // ─── 3D Extruded Buildings Layer ───────────────────────────────────────────
+  const add3DBuildingsLayer = useCallback((map: mapboxgl.Map) => {
+    if (!map.getSource('composite')) return;
+    if (map.getLayer('3d-buildings')) return;
+
+    const layers = map.getStyle().layers || [];
+    let labelLayerId: string | undefined;
+    for (const layer of layers) {
+      if (layer.type === 'symbol' && layer.layout && (layer.layout as any)['text-field']) {
+        labelLayerId = layer.id;
+        break;
+      }
+    }
+
+    map.addLayer(
+      {
+        id: '3d-buildings',
+        source: 'composite',
+        'source-layer': 'building',
+        filter: ['==', 'extrude', 'true'],
+        type: 'fill-extrusion',
+        minzoom: 13,
+        layout: {
+          visibility: is3DModeRef.current ? 'visible' : 'none',
+        },
+        paint: {
+          'fill-extrusion-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'height'],
+            0,
+            '#cbd5e1',
+            20,
+            '#94a3b8',
+            50,
+            '#64748b',
+            100,
+            '#334155',
+          ],
+          'fill-extrusion-height': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            13,
+            0,
+            14.5,
+            ['get', 'height'],
+          ],
+          'fill-extrusion-base': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            13,
+            0,
+            14.5,
+            ['get', 'min_height'],
+          ],
+          'fill-extrusion-opacity': 0.85,
+        },
+      },
+      labelLayerId
+    );
+  }, []);
+
+  // ─── 3D Atmospheric Fog ────────────────────────────────────────────────────
+  const setAtmosphereFog = useCallback((map: mapboxgl.Map, active: boolean) => {
+    try {
+      if (active) {
+        map.setFog({
+          range: [-1, 2],
+          color: 'rgba(255, 255, 255, 0.65)',
+          'horizon-blend': 0.15,
+          'high-color': '#7097c2',
+          'space-color': '#0f172a',
+          'star-intensity': 0.25,
+        });
+      } else {
+        map.setFog(null as any);
+      }
+    } catch {
+      /* gracefully ignore if fog is unsupported */
+    }
   }, []);
 
   // ─── Kecamatan layers ─────────────────────────────────────────────────────
@@ -536,10 +666,17 @@ const MapView: React.FC<MapViewProps> = ({
       minZoom: MIN_ZOOM,
       maxZoom: MAX_ZOOM,
       maxBounds: SURABAYA_BOUNDS,
+      pitch: 0,
+      bearing: 0,
+      pitchWithRotate: true,
+      dragRotate: true,
+      touchPitch: true,
     });
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: true, visualizePitch: true }), 'top-right');
 
     map.on('style.load', () => {
+      addSatelliteLayer(map);
+      add3DBuildingsLayer(map);
       addKecamatanLayers(map);
       addReportLayers(map);
       if (isInitialLoadRef.current) {
@@ -562,7 +699,7 @@ const MapView: React.FC<MapViewProps> = ({
       map.remove();
       mapRef.current = null;
     };
-  }, [debouncedFetchReports, addKecamatanLayers, addReportLayers, updateCustomMarkers]);
+  }, [debouncedFetchReports, addSatelliteLayer, add3DBuildingsLayer, addKecamatanLayers, addReportLayers, updateCustomMarkers]);
 
   // ─── Update data saat filteredReports berubah ────────────────────────────
   useEffect(() => {
@@ -774,8 +911,48 @@ const MapView: React.FC<MapViewProps> = ({
     const next: MapStyleMode = mapStyle === 'peta' ? 'satelit' : 'peta';
     setMapStyle(next);
     mapStyleRef.current = next;
-    mapRef.current?.setStyle(MAP_STYLES[next]);
+
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (map.getLayer('satellite-layer')) {
+      map.setLayoutProperty('satellite-layer', 'visibility', next === 'satelit' ? 'visible' : 'none');
+    }
+    if (map.getLayer('kecamatan-border')) {
+      map.setPaintProperty('kecamatan-border', 'line-color', next === 'satelit' ? '#FAF6EE' : '#B8AC94');
+    }
   }, [mapStyle]);
+
+  const handleToggle3D = useCallback(() => {
+    const next = !is3DMode;
+    setIs3DMode(next);
+    is3DModeRef.current = next;
+
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (next) {
+      map.easeTo({
+        pitch: 62,
+        bearing: -18,
+        duration: 1200,
+      });
+      setAtmosphereFog(map, true);
+      if (map.getLayer('3d-buildings')) {
+        map.setLayoutProperty('3d-buildings', 'visibility', 'visible');
+      }
+    } else {
+      map.easeTo({
+        pitch: 0,
+        bearing: 0,
+        duration: 1000,
+      });
+      setAtmosphereFog(map, false);
+      if (map.getLayer('3d-buildings')) {
+        map.setLayoutProperty('3d-buildings', 'visibility', 'none');
+      }
+    }
+  }, [is3DMode, setAtmosphereFog]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -784,17 +961,37 @@ const MapView: React.FC<MapViewProps> = ({
 
       {/* ── Kontrol Peta ── */}
       <div className="absolute bottom-3 left-3 z-[10] flex flex-wrap items-center gap-1.5">
-        {/* Style toggle */}
+        {/* Style toggle: Peta vs Foto Satelit */}
         <button
           type="button"
           onClick={handleToggleStyle}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-paper-white text-ink border border-ink text-xs font-sans font-medium hover:bg-paper-kraft active:translate-y-[1px] transition-colors select-none shadow-xs"
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-sans font-medium active:translate-y-[1px] transition-all select-none shadow-xs ${
+            mapStyle === 'satelit'
+              ? 'bg-[#1E3A5F] text-white border-[#1E3A5F] font-bold'
+              : 'bg-paper-white text-ink border-ink hover:bg-paper-kraft'
+          }`}
+          title="Beralih antara Peta Vektor dan Foto Satelit Asli"
         >
           {mapStyle === 'peta' ? (
             <><IconSatellite className="w-3.5 h-3.5 shrink-0" stroke={1.5} /><span>Satelit</span></>
           ) : (
-            <><IconMap2 className="w-3.5 h-3.5 shrink-0" stroke={1.5} /><span>Peta</span></>
+            <><IconMap2 className="w-3.5 h-3.5 shrink-0" stroke={1.5} /><span>Peta Vektor</span></>
           )}
+        </button>
+
+        {/* 3D Mode toggle */}
+        <button
+          type="button"
+          onClick={handleToggle3D}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-sans font-medium active:translate-y-[1px] transition-all select-none shadow-xs ${
+            is3DMode
+              ? 'bg-[#E67E22] text-white border-[#E67E22] font-bold shadow-sm'
+              : 'bg-paper-white text-ink border-ink hover:bg-paper-kraft'
+          }`}
+          title="Mode 3D — Sudut kamera miring & Gedung 3D Surabaya"
+        >
+          <Icon3dCubeSphere className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+          <span>{is3DMode ? '3D Aktif' : 'Mode 3D'}</span>
         </button>
 
         {/* Heatmap toggle */}
@@ -897,6 +1094,14 @@ const MapView: React.FC<MapViewProps> = ({
           <span className="text-[10px] font-sans font-medium text-navy">
             Radius 500m dari titik laporan
           </span>
+        </div>
+      )}
+
+      {/* 3D Mode Hint Banner */}
+      {is3DMode && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[10] bg-paper-white/95 border border-ink px-3 py-1.5 text-[11px] font-sans font-medium text-ink shadow-sm pointer-events-none flex items-center gap-1.5 rounded-sm">
+          <Icon3dCubeSphere className="w-4 h-4 text-orange shrink-0" />
+          <span><b>Mode 3D Aktif:</b> Tahan <b>Klik Kanan</b> atau <b>Ctrl + Geser Mouse</b> untuk rotasi & kemiringan 3D</span>
         </div>
       )}
 
