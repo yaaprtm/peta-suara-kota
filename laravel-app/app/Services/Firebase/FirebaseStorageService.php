@@ -38,7 +38,24 @@ class FirebaseStorageService
     {
         $ext = $file->getClientOriginalExtension() ?: 'jpg';
         $objectName = $directory . '/' . uniqid('', true) . '.' . $ext;
-        $mimeType = $file->getMimeType() ?: 'image/jpeg';
+        
+        // Hindari dependensi pada ext-fileinfo yang mungkin tidak aktif
+        $mimeType = 'image/jpeg';
+        try {
+            $mimeType = $file->getClientMimeType() ?: ($file->getMimeType() ?: 'image/jpeg');
+        } catch (\Throwable) {
+            $map = [
+                'jpg' => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'png' => 'image/png',
+                'webp' => 'image/webp',
+                'gif' => 'image/gif',
+                'mp3' => 'audio/mpeg',
+                'm4a' => 'audio/mp4',
+                'wav' => 'audio/wav',
+            ];
+            $mimeType = $map[strtolower($ext)] ?? 'application/octet-stream';
+        }
         $content = file_get_contents($file->getRealPath());
 
         if ($content === false) {

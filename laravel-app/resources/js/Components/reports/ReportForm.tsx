@@ -58,6 +58,61 @@ const SURABAYA_DISTRICTS = [
   { name: 'Tambaksari', lat: -7.2514, lng: 112.7661 },
 ];
 
+// Kompresi gambar sisi klien menggunakan canvas agar upload cepat & ukuran ramah jaringan
+const compressImage = (file: File, maxWidth = 1280, maxHeight = 1280, quality = 0.8): Promise<File> => {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
+      return resolve(file);
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(file);
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob && blob.size < file.size) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
 const ReportForm: React.FC<ReportFormProps> = ({
   onClose,
   onCancel,
@@ -246,9 +301,10 @@ const ReportForm: React.FC<ReportFormProps> = ({
       formData.append('kecamatan', kecName);
       if (address) formData.append('address', address.trim());
       if (audioTranscript) formData.append('audioTranscript', audioTranscript);
-      photos.forEach((photo) => {
-        formData.append('photos[]', photo);
-      });
+      for (const photo of photos) {
+        const compressed = await compressImage(photo);
+        formData.append('photos[]', compressed);
+      }
 
       // Kirim ke backend â€” jika gagal, lempar error ke user (jangan swallow)
       const res = (await reportsApi.create(formData)) as any;

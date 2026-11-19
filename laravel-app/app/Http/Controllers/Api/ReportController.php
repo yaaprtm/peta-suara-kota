@@ -271,17 +271,31 @@ class ReportController extends Controller
 
         $detectedKecamatan = $validation['kecamatan'];
 
-        // Upload foto ke Firebase Storage
+        // Upload foto (Firebase Storage dengan fallback otomatis Base64 Data URL)
         $photoPaths = [];
         if ($request->hasFile('photos')) {
+            $rawPhotos = $request->file('photos');
+            $photoList = is_array($rawPhotos) ? $rawPhotos : [$rawPhotos];
+
             try {
-                $rawPhotos = $request->file('photos');
-                $photoList = is_array($rawPhotos) ? $rawPhotos : [$rawPhotos];
                 $storageService = new FirebaseStorageService();
                 $photoPaths = $storageService->uploadMany($photoList, 'photos');
             } catch (\Throwable $e) {
                 error_log('Firebase Storage photo upload failed: ' . $e->getMessage());
-                // Foto tidak kritis — laporan tetap disimpan tanpa foto
+                $photoPaths = [];
+            }
+
+            // Fallback: Jika upload ke Firebase Storage gagal (misal bucket belum aktif),
+            // simpan foto sebagai Data URL langsung di Firestore agar foto TIDAK PERNAH HILANG!
+            if (empty($photoPaths)) {
+                foreach ($photoList as $file) {
+                    if ($file instanceof \Illuminate\Http\UploadedFile && $file->isValid()) {
+                        $dataUrl = self::fileToDataUrl($file);
+                        if ($dataUrl) {
+                            $photoPaths[] = $dataUrl;
+                        }
+                    }
+                }
             }
         }
 
@@ -406,16 +420,30 @@ class ReportController extends Controller
         if ($newStatus === 'SELESAI') {
             $compPhotos = $report['completion_photos'] ?? [];
             if ($request->hasFile('completion_photos')) {
+                $rawComp = $request->file('completion_photos');
+                $compList = is_array($rawComp) ? $rawComp : [$rawComp];
+                $newPhotos = [];
+
                 try {
                     $storageService = new FirebaseStorageService();
-                    $newPhotos = $storageService->uploadMany(
-                        $request->file('completion_photos'),
-                        'photos'
-                    );
-                    $compPhotos = array_merge($compPhotos, $newPhotos);
+                    $newPhotos = $storageService->uploadMany($compList, 'photos');
                 } catch (\Throwable $e) {
                     error_log('Firebase Storage completion_photos upload failed: ' . $e->getMessage());
+                    $newPhotos = [];
                 }
+
+                if (empty($newPhotos)) {
+                    foreach ($compList as $file) {
+                        if ($file instanceof \Illuminate\Http\UploadedFile && $file->isValid()) {
+                            $dataUrl = self::fileToDataUrl($file);
+                            if ($dataUrl) {
+                                $newPhotos[] = $dataUrl;
+                            }
+                        }
+                    }
+                }
+
+                $compPhotos = array_merge($compPhotos, $newPhotos);
             }
 
             $completionData = [
@@ -528,5 +556,34 @@ class ReportController extends Controller
             }
             fclose($handle);
         }, 200, $headers);
+    }
+
+    /**
+     * Konversi file gambar yang diunggah menjadi Base64 Data URL.
+     * Digunakan sebagai fallback aman jika Firebase Storage bucket belum tersedia.
+     */
+    private static function fileToDataUrl(\Illuminate\Http\UploadedFile $file): ?string
+    {
+        $realPath = $file->getRealPath();
+        if (!$realPath || !file_exists($realPath)) {
+            return null;
+        }
+
+        $content = file_get_contents($realPath);
+        if ($content === false || empty($content)) {
+            return null;
+        }
+
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $mimeMap = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            'gif' => 'image/gif',
+        ];
+        $mime = $mimeMap[$ext] ?? 'image/jpeg';
+
+        return 'data:' . $mime . ';base64,' . base64_encode($content);
     }
 }

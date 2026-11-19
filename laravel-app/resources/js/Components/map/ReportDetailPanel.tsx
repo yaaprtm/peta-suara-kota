@@ -68,7 +68,9 @@ const ReportDetailPanel: React.FC = () => {
   if (!isPanelOpen || !selectedReport) return null;
 
   const report = selectedReport;
-  const photoUrls = report.photos.map((p) => (p.startsWith('http') ? p : `/uploads/${p}`));
+  const photoUrls = (report.photos || []).map((p) =>
+    p.startsWith('http') || p.startsWith('data:') ? p : `/uploads/${p}`
+  );
   const transitions = STATUS_TRANSITIONS[report.status];
   const createdDate = parseISO(report.createdAt);
 
