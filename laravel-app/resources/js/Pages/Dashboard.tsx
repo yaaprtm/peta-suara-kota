@@ -22,6 +22,7 @@ import ReportForm from '@/Components/reports/ReportForm';
 import LanguageToggle from '@/Components/ui/LanguageToggle';
 import { useTranslation } from '@/i18n/useTranslation';
 import LazyMapView from '@/Components/map/LazyMapView';
+import ReportDetailPanel from '@/Components/map/ReportDetailPanel';
 
 const WargaDashboardPage: React.FC = () => {
   const navigate = (url: string) => router.visit(url);
@@ -365,6 +366,8 @@ const WargaDashboardPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Report Detail Panel slide-over */}
+      <ReportDetailPanel />
     </div>
   );
 };
