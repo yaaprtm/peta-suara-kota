@@ -12,6 +12,7 @@ import {
   IconX,
   Icon3dCubeSphere,
   IconDeviceCctv,
+  IconDroplet,
 } from '@tabler/icons-react';
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
@@ -19,6 +20,8 @@ import { createPinElement, PIN_STYLE } from './markers/createPin';
 import { fetchKecamatanGeoJSON, getKecamatanBounds } from '../../lib/kecamatan';
 import { statsApi } from '../../lib/api';
 import CctvModal, { CctvItem } from './CctvModal';
+import WaterSensorModal, { WaterPumpItem } from './WaterSensorModal';
+import TacticalCommandBar from './TacticalCommandBar';
 
 // ─── Mapbox Access Token Setup & Validation ───────────────────────────────────
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -164,6 +167,36 @@ function createCctvPinElement(cctv: CctvItem, onClick: () => void): HTMLElement 
   return el;
 }
 
+// ─── Helper: Buat elemen pin Rumah Pompa / Sensor Air ─────────────────────────
+function createWaterPumpPinElement(pump: WaterPumpItem, onClick: () => void): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'water-pump-pin-marker cursor-pointer select-none';
+  el.title = `${pump.name} (TMA: ${pump.waterLevelCm}cm) - Klik untuk telemetri pompa`;
+
+  const isWaspada = pump.status === 'waspada';
+  const isSiaga = pump.status === 'siaga';
+  const color = isSiaga ? '#ff4d4f' : isWaspada ? '#faad14' : '#00d2ff';
+
+  el.innerHTML = `
+    <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+      <div style="position: absolute; inset: 0; border-radius: 9999px; background: ${color}35; animation: ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+      <div style="position: relative; width: 28px; height: 28px; border-radius: 9999px; background: #06101e; border: 2px solid ${color}; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px ${color}80; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+        </svg>
+      </div>
+      <div style="position: absolute; top: 1px; right: 1px; width: 8px; height: 8px; border-radius: 9999px; background: ${color}; border: 1.5px solid #06101e; box-shadow: 0 0 6px ${color};"></div>
+    </div>
+  `;
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+
+  return el;
+}
+
 // ─── MapView Props ─────────────────────────────────────────────────────────────
 interface MapViewProps {
   onSelectReport: (report: Report) => void;
@@ -202,6 +235,12 @@ const MapView: React.FC<MapViewProps> = ({
   const [cctvData, setCctvData] = useState<CctvItem[]>([]);
   const [selectedCctv, setSelectedCctv] = useState<CctvItem | null>(null);
   const cctvMarkersRef = useRef<mapboxgl.Marker[]>([]);
+
+  const [isPumpMode, setIsPumpMode] = useState(false);
+  const isPumpModeRef = useRef(false);
+  const [pumpData, setPumpData] = useState<WaterPumpItem[]>([]);
+  const [selectedPump, setSelectedPump] = useState<WaterPumpItem | null>(null);
+  const pumpMarkersRef = useRef<mapboxgl.Marker[]>([]);
 
   const [densityData, setDensityData] = useState<KecamatanDensityItem[]>([]);
   const [maxDensity, setMaxDensity] = useState(1);
@@ -774,6 +813,8 @@ const MapView: React.FC<MapViewProps> = ({
       markersOnScreenRef.current.clear();
       cctvMarkersRef.current.forEach((m) => m.remove());
       cctvMarkersRef.current = [];
+      pumpMarkersRef.current.forEach((m) => m.remove());
+      pumpMarkersRef.current = [];
       map.remove();
       mapRef.current = null;
     };
@@ -1098,10 +1139,79 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, []);
 
+  const removePumpMarkers = useCallback(() => {
+    pumpMarkersRef.current.forEach((m) => m.remove());
+    pumpMarkersRef.current = [];
+  }, []);
+
+  const addPumpMarkers = useCallback(
+    (data: WaterPumpItem[]) => {
+      const map = mapRef.current;
+      if (!map) return;
+      removePumpMarkers();
+      data.forEach((pump) => {
+        const el = createWaterPumpPinElement(pump, () => {
+          setSelectedPump(pump);
+          map.flyTo({
+            center: [pump.lng, pump.lat],
+            zoom: Math.max(map.getZoom(), 15.5),
+            duration: 700,
+          });
+        });
+        const marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([pump.lng, pump.lat])
+          .addTo(map);
+        pumpMarkersRef.current.push(marker);
+      });
+    },
+    [removePumpMarkers]
+  );
+
+  const handleTogglePump = useCallback(async () => {
+    const next = !isPumpMode;
+    setIsPumpMode(next);
+    isPumpModeRef.current = next;
+
+    if (next) {
+      let items = pumpData;
+      if (items.length === 0) {
+        try {
+          const res = await fetch('/data/water-pumps-surabaya.json');
+          items = await res.json();
+          setPumpData(items);
+        } catch (err) {
+          console.error('Failed to load pump data:', err);
+        }
+      }
+      addPumpMarkers(items);
+    } else {
+      removePumpMarkers();
+    }
+  }, [isPumpMode, pumpData, addPumpMarkers, removePumpMarkers]);
+
+  const handleViewReportsNearPump = useCallback((pump: WaterPumpItem) => {
+    setSelectedPump(null);
+    if (mapRef.current) {
+      mapRef.current.flyTo({
+        center: [pump.lng, pump.lat],
+        zoom: 16.5,
+        duration: 800,
+      });
+    }
+  }, []);
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainerRef} className="w-full h-full" />
+
+      {/* ── Tactical Command Bar (Osiris AI Situation Room) ── */}
+      <TacticalCommandBar
+        reports={filteredReports}
+        cctvCount={40}
+        pumpCount={20}
+        onSelectReport={(r) => onSelectReportRef.current(r)}
+      />
 
       {/* ── Kontrol Peta ── */}
       <div className="absolute bottom-3 left-3 z-[10] flex flex-wrap items-center gap-1.5">
@@ -1181,6 +1291,21 @@ const MapView: React.FC<MapViewProps> = ({
         >
           <IconDeviceCctv className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
           <span>CCTV{isCctvMode ? ' Aktif' : ''}</span>
+        </button>
+
+        {/* Sensor Pompa Air toggle */}
+        <button
+          type="button"
+          onClick={handleTogglePump}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-sans font-medium active:translate-y-[1px] transition-all select-none shadow-xs ${
+            isPumpMode
+              ? 'bg-[#06182c] text-[#00d2ff] border-[#00d2ff] font-bold shadow-[0_0_8px_rgba(0,210,255,0.35)]'
+              : 'bg-paper-white text-ink border-ink hover:bg-paper-kraft'
+          }`}
+          title="Layer Sensor Air & Rumah Pompa — Pantauan ketinggian air (TMA) dan status pompa Surabaya"
+        >
+          <IconDroplet className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+          <span>Pompa Air{isPumpMode ? ' Aktif' : ''}</span>
         </button>
       </div>
 
@@ -1275,6 +1400,15 @@ const MapView: React.FC<MapViewProps> = ({
           cctv={selectedCctv}
           onClose={() => setSelectedCctv(null)}
           onViewReports={handleViewReportsNearCctv}
+        />
+      )}
+
+      {/* ── Water Sensor & Pump Modal ── */}
+      {selectedPump && (
+        <WaterSensorModal
+          pump={selectedPump}
+          onClose={() => setSelectedPump(null)}
+          onViewReports={handleViewReportsNearPump}
         />
       )}
     </div>
