@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Video, Droplets, Bell, Anchor, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+    IconShieldCheck,
+    IconVideo,
+    IconDroplet,
+    IconBell,
+    IconAnchor,
+    IconChevronUp,
+    IconChevronDown,
+} from '@tabler/icons-react';
 import { Report } from '../../types';
 
 interface TacticalCommandBarProps {
@@ -64,7 +72,7 @@ const TacticalCommandBar: React.FC<TacticalCommandBarProps> = ({
                 >
                     <span className="w-2 h-2 rounded-full bg-[#00ff88] animate-pulse" />
                     <span>COMMAND CENTER HUD</span>
-                    <ChevronDown size={12} />
+                    <IconChevronDown size={12} />
                 </button>
             </div>
         );
@@ -119,7 +127,7 @@ const TacticalCommandBar: React.FC<TacticalCommandBarProps> = ({
                     </div>
                 ) : (
                     <div className="text-[11px] font-mono text-slate-400 flex items-center justify-center gap-1.5">
-                        <ShieldCheck size={13} className="text-[#00ff88]" />
+                        <IconShieldCheck size={13} className="text-[#00ff88]" />
                         <span>WILAYAH SURABAYA DALAM STATUS KONDUSIF</span>
                     </div>
                 )}
@@ -136,7 +144,7 @@ const TacticalCommandBar: React.FC<TacticalCommandBarProps> = ({
                     }}
                     title="CCTV Persimpangan Surabaya Online"
                 >
-                    <Video size={11} />
+                    <IconVideo size={11} />
                     <span>{cctvCount} CCTV</span>
                 </div>
 
@@ -149,7 +157,7 @@ const TacticalCommandBar: React.FC<TacticalCommandBarProps> = ({
                     }}
                     title="Sensor Rumah Pompa & Pintu Air Aktif"
                 >
-                    <Droplets size={11} />
+                    <IconDroplet size={11} />
                     <span>{pumpCount} POMPA</span>
                 </div>
 
@@ -162,7 +170,7 @@ const TacticalCommandBar: React.FC<TacticalCommandBarProps> = ({
                     }}
                     title="Radar Transponder AIS Kapal Selat Madura & Tanjung Perak"
                 >
-                    <Anchor size={11} />
+                    <IconAnchor size={11} />
                     <span>{shipCount} KAPAL</span>
                 </div>
 
@@ -175,7 +183,7 @@ const TacticalCommandBar: React.FC<TacticalCommandBarProps> = ({
                     }}
                     title="Laporan Masuk Dari Warga"
                 >
-                    <Bell size={11} />
+                    <IconBell size={11} />
                     <span>{reports.length} LAPORAN</span>
                 </div>
 
@@ -184,7 +192,7 @@ const TacticalCommandBar: React.FC<TacticalCommandBarProps> = ({
                     className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                     title="Sembunyikan Status Bar"
                 >
-                    <ChevronUp size={13} />
+                    <IconChevronUp size={13} />
                 </button>
             </div>
         </div>

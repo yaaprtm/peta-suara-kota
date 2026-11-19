@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Radio, MapPin, Camera, AlertCircle } from 'lucide-react';
+import { IconX, IconRadio, IconMapPin, IconCamera, IconAlertCircle } from '@tabler/icons-react';
 
 export interface CctvItem {
     id: string;
@@ -75,7 +75,7 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                                     border: `1px solid ${isOnline ? 'rgba(0,255,136,0.5)' : isMaintenance ? 'rgba(255,165,0,0.5)' : 'rgba(255,80,80,0.5)'}`,
                                 }}
                             >
-                                <Camera
+                                <IconCamera
                                     size={20}
                                     style={{
                                         color: isOnline ? '#00ff88' : isMaintenance ? '#ffa500' : '#ff5050',
@@ -129,26 +129,26 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                         className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-red-500/20"
                         style={{ color: 'rgba(230,237,243,0.5)', border: '1px solid rgba(230,237,243,0.1)' }}
                     >
-                        <X size={16} />
+                        <IconX size={16} />
                     </button>
                 </div>
 
                 {/* Info Grid */}
                 <div className="relative p-4 grid grid-cols-2 gap-3">
                     <InfoCard
-                        icon={<MapPin size={14} />}
+                        icon={<IconMapPin size={14} />}
                         label="Lokasi Jalan"
                         value={cctv.street}
                         color="rgba(0,255,136,0.7)"
                     />
                     <InfoCard
-                        icon={<MapPin size={14} />}
+                        icon={<IconMapPin size={14} />}
                         label="Kecamatan"
                         value={cctv.district}
                         color="rgba(0,200,255,0.7)"
                     />
                     <InfoCard
-                        icon={<Radio size={14} />}
+                        icon={<IconRadio size={14} />}
                         label="Arah Pantau"
                         value={cctv.direction}
                         color="rgba(255,200,0,0.7)"
@@ -191,13 +191,13 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                                             border: '2px solid rgba(0,255,136,0.2)',
                                         }}
                                     >
-                                        <Camera size={28} style={{ color: 'rgba(0,255,136,0.4)' }} />
+                                        <IconCamera size={28} style={{ color: 'rgba(0,255,136,0.4)' }} />
                                     </div>
                                     <div
                                         className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
                                         style={{ background: 'rgba(255,80,80,0.2)', border: '1px solid rgba(255,80,80,0.4)' }}
                                     >
-                                        <AlertCircle size={12} style={{ color: '#ff5050' }} />
+                                        <IconAlertCircle size={12} style={{ color: '#ff5050' }} />
                                     </div>
                                 </div>
                                 <div className="text-center">

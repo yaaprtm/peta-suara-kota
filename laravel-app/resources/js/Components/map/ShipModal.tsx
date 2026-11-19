@@ -1,5 +1,13 @@
 import React from 'react';
-import { X, Navigation, Compass, Anchor, Gauge, Flag, Radio, Shield } from 'lucide-react';
+import {
+    IconX,
+    IconNavigation,
+    IconCompass,
+    IconAnchor,
+    IconGauge,
+    IconFlag,
+    IconRadio,
+} from '@tabler/icons-react';
 
 export interface ShipItem {
     id: string;
@@ -31,7 +39,6 @@ const ShipModal: React.FC<ShipModalProps> = ({ ship, onClose, onFocusShip }) => 
 
     const isUnderway = ship.status === 'underway';
     const isMoored = ship.status === 'moored';
-    const isAnchored = ship.status === 'anchored';
 
     const statusLabel = isUnderway ? 'BERLAYAR (UNDERWAY)' : isMoored ? 'SANDAR (MOORED)' : 'LABUH JANGKAR (ANCHORED)';
     const statusColor = isUnderway ? '#00ffaa' : isMoored ? '#38bdf8' : '#f59e0b';
@@ -98,7 +105,7 @@ const ShipModal: React.FC<ShipModalProps> = ({ ship, onClose, onFocusShip }) => 
                                 boxShadow: '0 0 14px rgba(0, 255, 170, 0.25)',
                             }}
                         >
-                            <Navigation
+                            <IconNavigation
                                 size={20}
                                 style={{
                                     color: '#00ffaa',
@@ -145,7 +152,7 @@ const ShipModal: React.FC<ShipModalProps> = ({ ship, onClose, onFocusShip }) => 
                         className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition-all hover:bg-white/10"
                         style={{ border: '1px solid rgba(255,255,255,0.1)' }}
                     >
-                        <X size={16} />
+                        <IconX size={16} />
                     </button>
                 </div>
 
@@ -161,7 +168,7 @@ const ShipModal: React.FC<ShipModalProps> = ({ ship, onClose, onFocusShip }) => 
                     >
                         <div>
                             <div className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
-                                <Flag size={11} />
+                                <IconFlag size={12} />
                                 <span>Tujuan / Rute Pelayaran</span>
                             </div>
                             <p className="text-sm font-bold text-slate-100">
@@ -186,7 +193,7 @@ const ShipModal: React.FC<ShipModalProps> = ({ ship, onClose, onFocusShip }) => 
                             }}
                         >
                             <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold mb-1">
-                                <Gauge size={13} />
+                                <IconGauge size={13} />
                                 <span>Kecepatan (SOG)</span>
                             </div>
                             <div className="flex items-baseline gap-1.5">
@@ -207,7 +214,7 @@ const ShipModal: React.FC<ShipModalProps> = ({ ship, onClose, onFocusShip }) => 
                             }}
                         >
                             <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold mb-1">
-                                <Compass size={13} />
+                                <IconCompass size={13} />
                                 <span>Arah / Haluan (COG)</span>
                             </div>
                             <div className="flex items-baseline gap-1.5">
@@ -255,7 +262,7 @@ const ShipModal: React.FC<ShipModalProps> = ({ ship, onClose, onFocusShip }) => 
                         }}
                     >
                         <div className="flex items-center gap-1.5">
-                            <Radio size={12} className="animate-pulse" />
+                            <IconRadio size={12} className="animate-pulse" />
                             <span>AIS CLASS-A TRANSCEIVER</span>
                         </div>
                         <span>{ship.lat.toFixed(5)}, {ship.lng.toFixed(5)}</span>

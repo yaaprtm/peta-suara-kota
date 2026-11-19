@@ -1,5 +1,13 @@
 import React from 'react';
-import { X, Droplets, Gauge, Activity, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
+import {
+    IconX,
+    IconDroplet,
+    IconGauge,
+    IconActivity,
+    IconAlertTriangle,
+    IconCircleCheck,
+    IconShieldExclamation,
+} from '@tabler/icons-react';
 
 export interface WaterPumpItem {
     id: string;
@@ -88,7 +96,7 @@ const WaterSensorModal: React.FC<WaterSensorModalProps> = ({ pump, onClose, onVi
                                 boxShadow: `0 0 14px ${statusColor}40`,
                             }}
                         >
-                            <Droplets size={20} style={{ color: statusColor }} />
+                            <IconDroplet size={20} style={{ color: statusColor }} />
                         </div>
 
                         <div>
@@ -111,7 +119,13 @@ const WaterSensorModal: React.FC<WaterSensorModalProps> = ({ pump, onClose, onVi
                                         border: `1px solid ${statusBorder}`,
                                     }}
                                 >
-                                    {isSiaga ? <ShieldAlert size={11} /> : isWaspada ? <AlertTriangle size={11} /> : <CheckCircle2 size={11} />}
+                                    {isSiaga ? (
+                                        <IconShieldExclamation size={12} />
+                                    ) : isWaspada ? (
+                                        <IconAlertTriangle size={12} />
+                                    ) : (
+                                        <IconCircleCheck size={12} />
+                                    )}
                                     {pump.status.toUpperCase()}
                                 </span>
                                 <span className="text-xs font-mono text-cyan-400/50">
@@ -132,7 +146,7 @@ const WaterSensorModal: React.FC<WaterSensorModalProps> = ({ pump, onClose, onVi
                         className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition-all hover:bg-white/10"
                         style={{ border: '1px solid rgba(255,255,255,0.1)' }}
                     >
-                        <X size={16} />
+                        <IconX size={16} />
                     </button>
                 </div>
 
@@ -148,7 +162,7 @@ const WaterSensorModal: React.FC<WaterSensorModalProps> = ({ pump, onClose, onVi
                     >
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-1.5 text-cyan-300 text-xs font-semibold uppercase tracking-wider">
-                                <Gauge size={14} />
+                                <IconGauge size={14} />
                                 <span>Tinggi Muka Air (TMA)</span>
                             </div>
                             <span className="font-mono text-xs font-bold" style={{ color: statusColor }}>
@@ -189,7 +203,7 @@ const WaterSensorModal: React.FC<WaterSensorModalProps> = ({ pump, onClose, onVi
                             }}
                         >
                             <div className="flex items-center gap-1.5 text-cyan-400 text-xs font-semibold mb-1">
-                                <Activity size={13} />
+                                <IconActivity size={13} />
                                 <span>Pompa Aktif</span>
                             </div>
                             <div className="flex items-baseline gap-1.5">
@@ -226,7 +240,7 @@ const WaterSensorModal: React.FC<WaterSensorModalProps> = ({ pump, onClose, onVi
                             }}
                         >
                             <div className="flex items-center gap-1.5 text-cyan-400 text-xs font-semibold mb-1">
-                                <Droplets size={13} />
+                                <IconDroplet size={13} />
                                 <span>Kapasitas Debit</span>
                             </div>
                             <div className="flex items-baseline gap-1.5">
