@@ -141,23 +141,22 @@ function debounce<T extends (...args: any[]) => void>(fn: T, ms: number) {
   };
 }
 
-// ─── Helper: Buat elemen pin CCTV dengan animasi pulsa ─────────────────────────
+// ─── Helper: Buat elemen pin CCTV dengan performa optimal ───────────────────────
 function createCctvPinElement(cctv: CctvItem, onClick: () => void): HTMLElement {
   const el = document.createElement('div');
   el.className = 'cctv-pin-marker cursor-pointer select-none';
   el.title = `${cctv.name} (${cctv.district}) - Klik untuk pantau CCTV`;
 
   el.innerHTML = `
-    <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-      <div style="position: absolute; inset: 0; border-radius: 9999px; background: rgba(0, 255, 136, 0.35); animation: ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-      <div style="position: relative; width: 28px; height: 28px; border-radius: 9999px; background: #0d1117; border: 2px solid #00ff88; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px rgba(0, 255, 136, 0.7); transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; will-change: transform; transform: translate3d(0,0,0);">
+      <div style="position: relative; width: 26px; height: 26px; border-radius: 9999px; background: #0d1117; border: 2px solid #00ff88; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 8px rgba(0, 255, 136, 0.45); transition: transform 0.15s ease;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00ff88" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M1 10h18a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1Z"/>
           <path d="m20 13 3-2v6l-3-2"/>
           <circle cx="7" cy="14" r="1.5"/>
         </svg>
       </div>
-      <div style="position: absolute; top: 1px; right: 1px; width: 8px; height: 8px; border-radius: 9999px; background: #00ff88; border: 1.5px solid #0d1117; box-shadow: 0 0 6px #00ff88;"></div>
+      <div style="position: absolute; top: 0; right: 0; width: 7px; height: 7px; border-radius: 9999px; background: #00ff88; border: 1.5px solid #0d1117;"></div>
     </div>
   `;
 
@@ -180,14 +179,13 @@ function createWaterPumpPinElement(pump: WaterPumpItem, onClick: () => void): HT
   const color = isSiaga ? '#ff4d4f' : isWaspada ? '#faad14' : '#00d2ff';
 
   el.innerHTML = `
-    <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-      <div style="position: absolute; inset: 0; border-radius: 9999px; background: ${color}35; animation: ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-      <div style="position: relative; width: 28px; height: 28px; border-radius: 9999px; background: #06101e; border: 2px solid ${color}; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px ${color}80; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; will-change: transform; transform: translate3d(0,0,0);">
+      <div style="position: relative; width: 26px; height: 26px; border-radius: 9999px; background: #06101e; border: 2px solid ${color}; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 8px ${color}60; transition: transform 0.15s ease;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
         </svg>
       </div>
-      <div style="position: absolute; top: 1px; right: 1px; width: 8px; height: 8px; border-radius: 9999px; background: ${color}; border: 1.5px solid #06101e; box-shadow: 0 0 6px ${color};"></div>
+      <div style="position: absolute; top: 0; right: 0; width: 7px; height: 7px; border-radius: 9999px; background: ${color}; border: 1.5px solid #06101e;"></div>
     </div>
   `;
 
@@ -209,14 +207,13 @@ function createShipPinElement(ship: ShipItem, onClick: () => void): HTMLElement 
   const color = isUnderway ? '#00ffaa' : '#38bdf8';
 
   el.innerHTML = `
-    <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-      <div style="position: absolute; inset: 0; border-radius: 9999px; background: ${color}25; animation: ping 3s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-      <div style="position: relative; width: 28px; height: 28px; border-radius: 9999px; background: #05141c; border: 2px solid ${color}; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px ${color}80; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="${color}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(${ship.courseDeg}deg); transition: transform 0.3s ease;">
+    <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; will-change: transform; transform: translate3d(0,0,0);">
+      <div style="position: relative; width: 26px; height: 26px; border-radius: 9999px; background: #05141c; border: 2px solid ${color}; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 8px ${color}60; transition: transform 0.15s ease;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="${color}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(${ship.courseDeg}deg);">
           <polygon points="12 2 19 21 12 17 5 21 12 2"/>
         </svg>
       </div>
-      <div style="position: absolute; top: 1px; right: 1px; width: 8px; height: 8px; border-radius: 9999px; background: ${color}; border: 1.5px solid #05141c; box-shadow: 0 0 6px ${color};"></div>
+      <div style="position: absolute; top: 0; right: 0; width: 7px; height: 7px; border-radius: 9999px; background: ${color}; border: 1.5px solid #05141c;"></div>
     </div>
   `;
 
@@ -910,10 +907,6 @@ const MapView: React.FC<MapViewProps> = ({
     });
     map.on('moveend', () => { debouncedFetchReports(map); updateCustomMarkers(); });
     map.on('zoomend', updateCustomMarkers);
-    map.on('idle', () => {
-      updateCustomMarkers();
-      applyRealisticWaterStyle(map, mapStyleRef.current);
-    });
     map.on('sourcedata', (e) => {
       if (e.sourceId === 'reports-source' && e.isSourceLoaded) updateCustomMarkers();
     });

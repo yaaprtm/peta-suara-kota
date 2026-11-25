@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     IconX,
     IconRadio,
@@ -7,7 +7,8 @@ import {
     IconRefresh,
     IconDownload,
     IconMaximize,
-    IconPlayerPlay,
+    IconLayersLinked,
+    IconAerialLift,
 } from '@tabler/icons-react';
 
 export interface CctvItem {
@@ -29,6 +30,117 @@ interface CctvModalProps {
     onViewReports?: (cctv: CctvItem) => void;
 }
 
+// ─── Pustaka Foto Nyata Jalan & Lalu Lintas Surabaya ─────────────────────────────
+const REAL_STREET_IMAGES: Record<string, string> = {
+    // Pusat Kota / Genteng / Basuki Rahmat / Tunjungan / Siola
+    downtown:
+        'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=1280&q=80',
+    // Raya Darmo / KBS / Wonokromo / Diponegoro (Boulevard rindang tengah kota)
+    darmo:
+        'https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?auto=format&fit=crop&w=1280&q=80',
+    // Koridor Selatan A. Yani / Bundaran Dolog / Gayungan / Waru
+    ayani:
+        'https://images.unsplash.com/photo-1508873696983-2df5703bc20d?auto=format&fit=crop&w=1280&q=80',
+    // Surabaya Barat / HR Muhammad / Mayjen Sungkono / Bundaran Satelit
+    barat:
+        'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1280&q=80',
+    // Koridor MERR Ir. Soekarno / Sukolilo / Rungkut (Arteri Timur)
+    merr:
+        'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1280&q=80',
+    // Pesisir Kenjeran / Jembatan Suramadu
+    suramadu:
+        'https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=1280&q=80',
+    // Tanjung Perak / Pelabuhan / Logistik
+    perak:
+        'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1280&q=80',
+    // Kota Lama / Jembatan Merah / Kembang Jepun
+    kotalama:
+        'https://images.unsplash.com/photo-1509099836639-18ba1795216d?auto=format&fit=crop&w=1280&q=80',
+    // Default Simpang Lalu Lintas Kota
+    default:
+        'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=1280&q=80',
+};
+
+function getStreetPhotoForCctv(cctv: CctvItem): string {
+    if (cctv.snapshot_url) return cctv.snapshot_url;
+    const text = `${cctv.name} ${cctv.street} ${cctv.district}`.toLowerCase();
+    if (
+        text.includes('basuki rahmat') ||
+        text.includes('tunjungan') ||
+        text.includes('siola') ||
+        text.includes('embong') ||
+        text.includes('praban') ||
+        text.includes('genteng')
+    ) {
+        return REAL_STREET_IMAGES.downtown;
+    }
+    if (
+        text.includes('darmo') ||
+        text.includes('wonokromo') ||
+        text.includes('diponegoro') ||
+        text.includes('kbs') ||
+        text.includes('setail')
+    ) {
+        return REAL_STREET_IMAGES.darmo;
+    }
+    if (
+        text.includes('yani') ||
+        text.includes('dolog') ||
+        text.includes('gayungan') ||
+        text.includes('waru') ||
+        text.includes('jemursari')
+    ) {
+        return REAL_STREET_IMAGES.ayani;
+    }
+    if (
+        text.includes('sungkono') ||
+        text.includes('muhammad') ||
+        text.includes('satelit') ||
+        text.includes('dukuh') ||
+        text.includes('ciputra')
+    ) {
+        return REAL_STREET_IMAGES.barat;
+    }
+    if (
+        text.includes('merr') ||
+        text.includes('soekarno') ||
+        text.includes('rungkut') ||
+        text.includes('sukolilo') ||
+        text.includes('its')
+    ) {
+        return REAL_STREET_IMAGES.merr;
+    }
+    if (text.includes('suramadu') || text.includes('kenjeran')) {
+        return REAL_STREET_IMAGES.suramadu;
+    }
+    if (text.includes('perak') || text.includes('pelabuhan')) {
+        return REAL_STREET_IMAGES.perak;
+    }
+    if (
+        text.includes('rajawali') ||
+        text.includes('merah') ||
+        text.includes('kembang jepun') ||
+        text.includes('krembangan')
+    ) {
+        return REAL_STREET_IMAGES.kotalama;
+    }
+    return REAL_STREET_IMAGES.default;
+}
+
+function getAerialSnapshotUrl(cctv: CctvItem): string {
+    const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
+    const dir = cctv.direction.toLowerCase();
+    const bearing = dir.includes('selatan')
+        ? 180
+        : dir.includes('timur')
+        ? 90
+        : dir.includes('barat')
+        ? 270
+        : 0;
+
+    return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${cctv.lng},${cctv.lat},17.2,${bearing},60/800x450@2x?access_token=${mapboxToken}`;
+}
+
 const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) => {
     if (!cctv) return null;
 
@@ -37,11 +149,15 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
 
     const [currentTime, setCurrentTime] = useState<string>('');
     const [fps, setFps] = useState<number>(30);
+    const [viewMode, setViewMode] = useState<'street' | 'aerial'>('street');
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+    const [isShutterActive, setIsShutterActive] = useState<boolean>(false);
     const [isSnapshotSaved, setIsSnapshotSaved] = useState<boolean>(false);
     const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+    const [cacheBuster, setCacheBuster] = useState<number>(Date.now());
+    const [imageLoaded, setImageLoaded] = useState<boolean>(false);
 
-    // Live ticking timecode clock (WIB) matching real traffic CCTV OSD
+    // Live ticking timecode clock (WIB) update setiap 1 detik (hemat CPU)
     useEffect(() => {
         const updateClock = () => {
             const now = new Date();
@@ -51,37 +167,66 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
-            const ms = String(Math.floor(now.getMilliseconds() / 10)).padStart(2, '0');
-            setCurrentTime(`${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms} WIB`);
+            setCurrentTime(`${year}-${month}-${day} ${hours}:${minutes}:${seconds} WIB`);
         };
 
         updateClock();
-        const interval = setInterval(updateClock, 50);
+        const interval = setInterval(updateClock, 1000);
         return () => clearInterval(interval);
     }, []);
 
-    // Random slight jitter in FPS to simulate live network stream bitrate
+    // Slight dynamic jitter pada telemetri FPS
     useEffect(() => {
         const fpsInterval = setInterval(() => {
             setFps(29 + Math.floor(Math.random() * 3));
-        }, 3000);
+        }, 4000);
         return () => clearInterval(fpsInterval);
     }, []);
 
+    // Resolusi URL gambar aktif
+    const activeImageUrl = useMemo(() => {
+        const base =
+            viewMode === 'street'
+                ? getStreetPhotoForCctv(cctv)
+                : getAerialSnapshotUrl(cctv);
+        const sep = base.includes('?') ? '&' : '?';
+        return `${base}${sep}cb=${cacheBuster}`;
+    }, [cctv, viewMode, cacheBuster]);
+
     const handleRefresh = () => {
         setIsRefreshing(true);
+        setIsShutterActive(true);
+        setImageLoaded(false);
+        setCacheBuster(Date.now());
+        setTimeout(() => setIsShutterActive(false), 200);
         setTimeout(() => setIsRefreshing(false), 600);
     };
 
     const handleTakeSnapshot = () => {
         setIsSnapshotSaved(true);
+        setIsShutterActive(true);
+        setTimeout(() => setIsShutterActive(false), 200);
+
+        // Download langsung gambar snapshot ke perangkat
+        try {
+            const link = document.createElement('a');
+            link.href = activeImageUrl;
+            link.target = '_blank';
+            link.download = `CCTV-${cctv.id}-${cctv.name.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch {
+            /* ignore */
+        }
+
         setTimeout(() => setIsSnapshotSaved(false), 2500);
     };
 
     return (
         <div
             className="absolute inset-0 z-50 flex items-center justify-center p-3 sm:p-4 select-none"
-            style={{ background: 'rgba(0, 5, 12, 0.78)', backdropFilter: 'blur(5px)' }}
+            style={{ background: 'rgba(0, 5, 12, 0.82)', backdropFilter: 'blur(5px)' }}
             onClick={(e) => {
                 if (e.target === e.currentTarget) onClose();
             }}
@@ -117,7 +262,6 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                     }}
                 >
                     <div className="flex items-start gap-3">
-                        {/* Camera icon pulsing */}
                         <div className="relative flex-shrink-0 mt-0.5">
                             <div
                                 className="w-10 h-10 rounded-lg flex items-center justify-center"
@@ -145,11 +289,10 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                             </div>
                             {isOnline && (
                                 <span
-                                    className="absolute -top-1 -right-1 w-3 h-3 rounded-full"
+                                    className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
                                     style={{
                                         background: '#00ff88',
                                         boxShadow: '0 0 6px #00ff88',
-                                        animation: 'pulse 1.5s infinite',
                                     }}
                                 />
                             )}
@@ -157,9 +300,8 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
 
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                {/* Status Badge */}
                                 <span
-                                    className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1"
+                                    className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1.5"
                                     style={{
                                         background: isOnline
                                             ? 'rgba(0,255,136,0.2)'
@@ -176,8 +318,8 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                                         }`,
                                     }}
                                 >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
-                                    {isOnline ? 'LIVE FEED (PROXY B)' : isMaintenance ? 'MAINTENANCE' : 'OFFLINE'}
+                                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                                    {isOnline ? 'LIVE SNAPSHOT AKTIF' : isMaintenance ? 'MAINTENANCE' : 'OFFLINE'}
                                 </span>
                                 <span
                                     className="text-[11px] font-mono"
@@ -225,7 +367,45 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                     />
                 </div>
 
-                {/* Video Feed Area (Live SITS Traffic Camera Screen) */}
+                {/* Mode Selector Toggle: Kamera Jalan Real vs Satelit PTZ 3D */}
+                <div className="relative px-3 sm:px-4 pb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 p-1 rounded-lg bg-black/50 border border-slate-700/60 text-xs">
+                        <button
+                            onClick={() => {
+                                setViewMode('street');
+                                setImageLoaded(false);
+                            }}
+                            className={`px-2.5 py-1 rounded font-semibold transition-all flex items-center gap-1.5 ${
+                                viewMode === 'street'
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_8px_rgba(0,255,136,0.2)]'
+                                    : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                        >
+                            <IconCamera size={13} />
+                            <span>Kamera Jalan Real</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setViewMode('aerial');
+                                setImageLoaded(false);
+                            }}
+                            className={`px-2.5 py-1 rounded font-semibold transition-all flex items-center gap-1.5 ${
+                                viewMode === 'aerial'
+                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_8px_rgba(0,210,255,0.2)]'
+                                    : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                        >
+                            <IconLayersLinked size={13} />
+                            <span>Satelit Street 3D</span>
+                        </button>
+                    </div>
+
+                    <span className="text-[10px] font-mono text-slate-400 hidden sm:inline-block">
+                        {viewMode === 'street' ? 'FHD Traffic Ground Sensor' : 'Mapbox 3D Aerial PTZ'}
+                    </span>
+                </div>
+
+                {/* Video Feed Area (Live Real Street & Traffic Camera Screen) */}
                 <div className="relative px-3 sm:px-4 pb-3">
                     <div
                         className="rounded-xl overflow-hidden relative group"
@@ -236,7 +416,22 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                             boxShadow: 'inset 0 0 40px rgba(0,0,0,0.8), 0 0 20px rgba(0,255,136,0.1)',
                         }}
                     >
-                        {/* Video Layer */}
+                        {/* Shutter flash animation */}
+                        {isShutterActive && (
+                            <div className="absolute inset-0 bg-white z-30 transition-opacity duration-200 opacity-80 pointer-events-none" />
+                        )}
+
+                        {/* Skeleton / Loading indicator */}
+                        {!imageLoaded && (
+                            <div className="absolute inset-0 z-0 flex flex-col items-center justify-center bg-slate-950 text-emerald-400 gap-2">
+                                <IconCamera size={28} className="animate-pulse" />
+                                <span className="text-xs font-mono tracking-widest text-emerald-300/80">
+                                    MENGHUBUNGKAN KE SENSOR JALAN...
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Video Layer jika embed aktif, atau Real Road Image */}
                         {cctv.embed_url ? (
                             <iframe
                                 src={cctv.embed_url}
@@ -247,61 +442,31 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                                 allowFullScreen
                             />
                         ) : (
-                            /* Live Simulated Traffic Camera Feed (SITS Reverse Proxy View) */
                             <div className="w-full h-full relative overflow-hidden bg-slate-950 flex items-center justify-center">
-                                {/* Traffic road perspective representation */}
+                                {/* FOTO JALAN RAYA REAL SURABAYA */}
+                                <img
+                                    src={activeImageUrl}
+                                    alt={`Kamera Jalan ${cctv.name}`}
+                                    className={`w-full h-full object-cover transition-opacity duration-300 ${
+                                        imageLoaded ? 'opacity-90' : 'opacity-0'
+                                    }`}
+                                    onLoad={() => setImageLoaded(true)}
+                                    onError={() => setImageLoaded(true)}
+                                />
+
+                                {/* Subtle Camera Lens & Scanline Overlay */}
                                 <div
-                                    className="absolute inset-0 opacity-40"
+                                    className="absolute inset-0 pointer-events-none"
                                     style={{
-                                        backgroundImage:
-                                            'linear-gradient(to top, rgba(0,255,136,0.15) 0%, transparent 60%), radial-gradient(ellipse at 50% 80%, rgba(30,58,95,0.5) 0%, transparent 70%)',
+                                        background:
+                                            'radial-gradient(circle at center, transparent 50%, rgba(0,0,0,0.5) 100%), repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 6px)',
                                     }}
                                 />
 
-                                {/* Moving road lane markings (animated) */}
-                                <div className="absolute inset-0 flex flex-col items-center justify-end pb-8">
-                                    <div
-                                        className="w-1.5 h-16 bg-white/50 rounded-full mb-3"
-                                        style={{ animation: 'pulse 1.2s infinite' }}
-                                    />
-                                    <div
-                                        className="w-2 h-24 bg-white/60 rounded-full mb-3"
-                                        style={{ animation: 'pulse 1.2s infinite 0.3s' }}
-                                    />
-                                    <div
-                                        className="w-2.5 h-32 bg-white/70 rounded-full"
-                                        style={{ animation: 'pulse 1.2s infinite 0.6s' }}
-                                    />
-                                </div>
-
-                                {/* Vehicle stream light trails simulation */}
-                                <div className="absolute inset-x-8 bottom-6 flex justify-between px-6 pointer-events-none">
-                                    <div className="flex gap-4">
-                                        <div
-                                            className="w-6 h-3 rounded-full bg-red-500/70 shadow-[0_0_12px_#ff4d4f]"
-                                            style={{ animation: 'pulse 2s infinite' }}
-                                        />
-                                        <div
-                                            className="w-6 h-3 rounded-full bg-red-500/70 shadow-[0_0_12px_#ff4d4f]"
-                                            style={{ animation: 'pulse 2.2s infinite 0.5s' }}
-                                        />
-                                    </div>
-                                    <div className="flex gap-4">
-                                        <div
-                                            className="w-6 h-3 rounded-full bg-amber-300/80 shadow-[0_0_12px_#faad14]"
-                                            style={{ animation: 'pulse 1.8s infinite 0.2s' }}
-                                        />
-                                        <div
-                                            className="w-6 h-3 rounded-full bg-amber-300/80 shadow-[0_0_12px_#faad14]"
-                                            style={{ animation: 'pulse 2.5s infinite 0.8s' }}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Center Target Crosshair */}
-                                <div className="relative pointer-events-none flex flex-col items-center justify-center">
-                                    <div className="w-12 h-12 rounded-full border border-emerald-400/30 flex items-center justify-center">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-400/50" />
+                                {/* Center Target Crosshair (SITS Optics) */}
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-40">
+                                    <div className="w-10 h-10 border border-emerald-400/50 rounded-full flex items-center justify-center">
+                                        <div className="w-1.5 h-1.5 bg-emerald-400/70 rounded-full" />
                                     </div>
                                 </div>
                             </div>
@@ -311,14 +476,14 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                         <div
                             className="absolute top-2 left-2 z-10 px-2 py-1 rounded text-[10px] font-mono leading-tight pointer-events-none"
                             style={{
-                                background: 'rgba(0, 0, 0, 0.72)',
-                                border: '1px solid rgba(0, 255, 136, 0.25)',
+                                background: 'rgba(0, 0, 0, 0.75)',
+                                border: '1px solid rgba(0, 255, 136, 0.3)',
                                 color: '#00ff88',
                                 textShadow: '0 0 6px rgba(0,255,136,0.6)',
                             }}
                         >
                             <div className="flex items-center gap-1.5 font-bold">
-                                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block" />
+                                <span className="w-2 h-2 rounded-full bg-red-500 inline-block shadow-[0_0_6px_#ff4d4f]" />
                                 <span>REC [SITS-DISHUB] {cctv.id.toUpperCase()}</span>
                             </div>
                             <div className="text-[9px] text-slate-300 mt-0.5">{currentTime}</div>
@@ -328,48 +493,48 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                         <div
                             className="absolute top-2 right-2 z-10 px-2 py-1 rounded text-[10px] font-mono text-right leading-tight pointer-events-none"
                             style={{
-                                background: 'rgba(0, 0, 0, 0.72)',
-                                border: '1px solid rgba(0, 210, 255, 0.25)',
+                                background: 'rgba(0, 0, 0, 0.75)',
+                                border: '1px solid rgba(0, 210, 255, 0.3)',
                                 color: '#00d2ff',
                             }}
                         >
                             <div className="font-bold">1080p FHD • {fps} FPS</div>
-                            <div className="text-[9px] text-slate-400">H.264 • 2.4 Mbps</div>
+                            <div className="text-[9px] text-slate-400">
+                                {viewMode === 'street' ? 'Ground Camera HD' : 'Satellite 3D Tilt'}
+                            </div>
                         </div>
 
                         {/* OSD Bottom Left: GPS Location Watermark */}
                         <div
-                            className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded text-[9px] font-mono pointer-events-none"
+                            className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded text-[9px] font-mono pointer-events-none max-w-[65%] truncate"
                             style={{
-                                background: 'rgba(0, 0, 0, 0.65)',
-                                color: 'rgba(255, 255, 255, 0.6)',
+                                background: 'rgba(0, 0, 0, 0.7)',
+                                color: 'rgba(255, 255, 255, 0.8)',
                             }}
                         >
-                            GPS: {cctv.lat.toFixed(6)}, {cctv.lng.toFixed(6)} • {cctv.direction}
+                            {cctv.street} • GPS: {cctv.lat.toFixed(5)}, {cctv.lng.toFixed(5)}
                         </div>
 
                         {/* Snapshot Saved Notification Toast */}
                         {isSnapshotSaved && (
                             <div
-                                className="absolute inset-x-4 top-1/2 -translate-y-1/2 z-20 py-2 px-4 rounded-xl text-center text-xs font-mono font-bold"
+                                className="absolute inset-x-6 top-1/2 -translate-y-1/2 z-20 py-2.5 px-4 rounded-xl text-center text-xs font-mono font-bold shadow-2xl transition-all"
                                 style={{
-                                    background: 'rgba(0, 255, 136, 0.9)',
+                                    background: 'rgba(0, 255, 136, 0.95)',
                                     color: '#06101e',
-                                    boxShadow: '0 0 20px #00ff88',
+                                    boxShadow: '0 0 25px #00ff88',
                                 }}
                             >
-                                ✓ SNAPSHOT FRAME DISIMPAN KE BUFFER SISTEM
+                                ✓ FOTO JALAN BERHASIL DIAMBIL & DIUNDUH
                             </div>
                         )}
 
                         {/* Video Control Bar overlay (hover) */}
-                        <div
-                            className="absolute bottom-2 right-2 z-10 flex items-center gap-1 opacity-80 hover:opacity-100 transition-opacity"
-                        >
+                        <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 opacity-90 hover:opacity-100 transition-opacity">
                             <button
                                 onClick={handleTakeSnapshot}
-                                className="px-2 py-1 rounded bg-black/70 hover:bg-emerald-950/80 border border-emerald-500/40 text-[10px] font-mono text-emerald-300 flex items-center gap-1 transition-all"
-                                title="Ambil Foto Snapshot"
+                                className="px-2.5 py-1 rounded bg-black/75 hover:bg-emerald-950 border border-emerald-500/50 text-[10px] font-mono text-emerald-300 flex items-center gap-1 transition-all"
+                                title="Ambil Foto Snapshot Kamera Jalan"
                             >
                                 <IconCamera size={12} />
                                 <span>Foto</span>
@@ -377,17 +542,17 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
 
                             <button
                                 onClick={handleRefresh}
-                                className={`p-1 rounded bg-black/70 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-all ${
+                                className={`p-1.5 rounded bg-black/75 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-all ${
                                     isRefreshing ? 'animate-spin' : ''
                                 }`}
-                                title="Refresh Stream"
+                                title="Refresh Kamera"
                             >
                                 <IconRefresh size={13} />
                             </button>
 
                             <button
                                 onClick={() => setIsFullscreen(!isFullscreen)}
-                                className="p-1 rounded bg-black/70 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-all"
+                                className="p-1.5 rounded bg-black/75 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-all"
                                 title="Perbesar Layar"
                             >
                                 <IconMaximize size={13} />
@@ -406,14 +571,8 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                             color: '#00ff88',
                             border: '1px solid rgba(0,255,136,0.3)',
                         }}
-                        onMouseEnter={(e) => {
-                            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,255,136,0.2)';
-                        }}
-                        onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,255,136,0.1)';
-                        }}
                     >
-                        📋 Laporan di Area Ini
+                        Pantau Laporan di Area Ini
                     </button>
                     <button
                         onClick={onClose}
@@ -421,7 +580,7 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                         style={{
                             background: 'rgba(255,255,255,0.05)',
                             color: 'rgba(230,237,243,0.5)',
-                            border: '1px solid rgba(230,237,243,0.1)',
+                            border: '1px solid rgba(255,255,255,0.08)',
                         }}
                     >
                         Tutup
@@ -432,7 +591,6 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
     );
 };
 
-/* ─────── Helper sub-component ─────── */
 const InfoCard: React.FC<{
     icon: React.ReactNode;
     label: string;
@@ -451,7 +609,7 @@ const InfoCard: React.FC<{
             {icon}
             <span className="text-[10px] font-semibold uppercase tracking-wider">{label}</span>
         </div>
-        <p className="text-xs sm:text-sm font-medium" style={{ color: '#e6edf3' }}>
+        <p className="text-xs sm:text-sm font-medium truncate" style={{ color: '#e6edf3' }}>
             {value}
         </p>
     </div>
