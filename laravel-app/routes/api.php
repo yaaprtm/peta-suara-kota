@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CctvController;
 use App\Http\Controllers\Api\KelurahanController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\StatsController;
@@ -54,6 +55,14 @@ Route::middleware(['web'])->group(function () {
         Route::get('overview', [StatsController::class, 'overview']);
         Route::get('leaderboard', [StatsController::class, 'leaderboard']);
         Route::get('kecamatan-density', [StatsController::class, 'kecamatanDensity']); // GIS: choropleth
+    });
+
+    // CCTV endpoints & Reverse Proxy (Method B)
+    Route::prefix('cctv')->group(function () {
+        Route::get('/', [CctvController::class, 'index']);
+        Route::get('{id}', [CctvController::class, 'show']);
+        Route::get('{id}/feed', [CctvController::class, 'streamProxy']);
+        Route::get('{id}/snapshot', [CctvController::class, 'snapshotProxy']);
     });
 
     // User management endpoints (ADMIN/SUPERADMIN only)

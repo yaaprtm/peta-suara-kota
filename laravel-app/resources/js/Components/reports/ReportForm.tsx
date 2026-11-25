@@ -426,9 +426,9 @@ const ReportForm: React.FC<ReportFormProps> = ({
             className={clsx('w-full flex items-center justify-center gap-2 py-2 rounded-lg border text-xs font-semibold transition-all mt-1.5',
               gpsLocation ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-navy/5 border-navy/20 text-navy hover:bg-navy/10'
             )}>
-            {isGettingGPS ? <><IconLoader2 className="w-3.5 h-3.5 animate-spin"/>Mendapatkan GPSâ€¦</>
-              : gpsLocation ? <><IconCurrentLocation className="w-3.5 h-3.5"/>GPS Aktif âœ“ Â±{gpsAccuracy}m</>
-              : <><IconCurrentLocation className="w-3.5 h-3.5"/>Gunakan Lokasi Saya (GPS)</>}
+            {isGettingGPS ? <><IconLoader2 className="w-3.5 h-3.5 animate-spin" />Mendapatkan GPSâ€¦</>
+              : gpsLocation ? <><IconCurrentLocation className="w-3.5 h-3.5" />GPS Aktif âœ“ Â±{gpsAccuracy}m</>
+                : <><IconCurrentLocation className="w-3.5 h-3.5" />Gunakan Lokasi Saya (GPS)</>}
           </button>
           {onPickLocation && (
             <button type="button" onClick={onPickLocation}
