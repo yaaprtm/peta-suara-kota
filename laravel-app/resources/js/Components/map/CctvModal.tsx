@@ -24,6 +24,7 @@ export interface CctvItem {
     status: 'online' | 'offline' | 'maintenance';
     embed_url: string | null;
     snapshot_url: string | null;
+    nusantara_cam?: string | null;
 }
 
 interface CctvModalProps {
@@ -31,13 +32,6 @@ interface CctvModalProps {
     onClose: () => void;
     onViewReports?: (cctv: CctvItem) => void;
 }
-
-// Video arus lalu lintas nyata untuk mode simulasi live video
-const LIVE_TRAFFIC_VIDEOS = [
-    'https://assets.mixkit.co/videos/preview/mixkit-traffic-in-a-busy-avenue-at-night-42838-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-daytime-traffic-on-a-busy-city-avenue-42839-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-traffic-on-a-city-street-with-cars-and-bicycles-42840-large.mp4',
-];
 
 function getBearingFromDirection(direction: string): number {
     const d = direction.toLowerCase();
@@ -102,12 +96,23 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
         return `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${cctv.lng},${cctv.lat},17.5,${bearing},60/800x450@2x?access_token=${mapboxToken}&cb=${cacheBuster}`;
     }, [cctv, bearing, cacheBuster]);
 
-    // Video stream URL
-    const activeVideoUrl = useMemo(() => {
-        if (cctv.embed_url) return cctv.embed_url;
-        // Pilih video loop berdasarkan ID kamera agar konsisten
-        const hash = cctv.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        return LIVE_TRAFFIC_VIDEOS[hash % LIVE_TRAFFIC_VIDEOS.length];
+    // URL video embed (jika kamera memiliki stream YouTube/MP4 langsung)
+    const directEmbedUrl = useMemo(() => {
+        if (!cctv.embed_url) return null;
+        return cctv.embed_url;
+    }, [cctv]);
+
+    const isDirectVideoFile = useMemo(() => {
+        if (!directEmbedUrl) return false;
+        return /\.(mp4|webm|ogg)(\?.*)?$/i.test(directEmbedUrl);
+    }, [directEmbedUrl]);
+
+    // Link langsung ke Pantau CCTV Nusantara (Surabaya)
+    const cctvNusantaraUrl = useMemo(() => {
+        if (cctv.nusantara_cam) {
+            return `https://cctvnusantara.com/?cam=${encodeURIComponent(cctv.nusantara_cam)}`;
+        }
+        return 'https://cctvnusantara.com/';
     }, [cctv]);
 
     // Google Maps interactive iframe URL
@@ -414,36 +419,82 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                             </div>
                         )}
 
-                        {/* MODE 2: LIVE VIDEO STREAM ARUS KENDARAAN */}
+                        {/* MODE 2: LIVE VIDEO STREAM / PORTAL CCTV NUSANTARA */}
                         {viewMode === 'video' && (
-                            <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
-                                <video
-                                    src={activeVideoUrl}
-                                    autoPlay
-                                    loop
-                                    muted
-                                    playsInline
-                                    className={`w-full h-full object-cover transition-opacity duration-300 ${
-                                        feedLoaded ? 'opacity-90' : 'opacity-0'
-                                    }`}
-                                    onCanPlay={() => setFeedLoaded(true)}
-                                />
+                            <div className="w-full h-full relative overflow-hidden bg-slate-950 flex items-center justify-center">
+                                {directEmbedUrl ? (
+                                    isDirectVideoFile ? (
+                                        <video
+                                            src={directEmbedUrl}
+                                            autoPlay
+                                            loop
+                                            muted
+                                            playsInline
+                                            className={`w-full h-full object-cover transition-opacity duration-300 ${
+                                                feedLoaded ? 'opacity-95' : 'opacity-0'
+                                            }`}
+                                            onCanPlay={() => setFeedLoaded(true)}
+                                            onError={() => setFeedLoaded(true)}
+                                        />
+                                    ) : (
+                                        <iframe
+                                            src={directEmbedUrl}
+                                            title={`Live Stream - ${cctv.name}`}
+                                            className="w-full h-full"
+                                            style={{ border: 'none' }}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                            onLoad={() => setFeedLoaded(true)}
+                                        />
+                                    )
+                                ) : (
+                                    <>
+                                        {/* Latar belakang citra satelit nyata titik Surabaya */}
+                                        <img
+                                            src={realSurabayaPtzUrl}
+                                            alt={`Preview ${cctv.name}`}
+                                            className="w-full h-full object-cover opacity-35 blur-[1px]"
+                                            onLoad={() => setFeedLoaded(true)}
+                                            onError={() => setFeedLoaded(true)}
+                                        />
 
-                                {/* Scanline & Lens effect */}
-                                <div
-                                    className="absolute inset-0 pointer-events-none"
-                                    style={{
-                                        background:
-                                            'radial-gradient(circle at center, transparent 50%, rgba(0,0,0,0.55) 100%), repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 4px)',
-                                    }}
-                                />
-
-                                {/* Center Target Crosshair */}
-                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-50">
-                                    <div className="w-10 h-10 border border-emerald-400/60 rounded-full flex items-center justify-center">
-                                        <div className="w-1.5 h-1.5 bg-emerald-400/80 rounded-full" />
-                                    </div>
-                                </div>
+                                        {/* Panel Akses Live Stream Resmi Eksternal */}
+                                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center bg-slate-950/55">
+                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold mb-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                                <span>LIVE STREAM TERSEDIA DI PORTAL RESMI</span>
+                                            </div>
+                                            <p className="text-xs text-slate-200 max-w-sm leading-relaxed mb-3">
+                                                Stream CCTV <span className="font-semibold text-white">{cctv.name}</span> dilindungi kebijakan embed eksternal (<code className="text-emerald-300">SAMEORIGIN</code>). Klik tombol di bawah untuk menonton siaran langsung nyata.
+                                            </p>
+                                            <div className="flex flex-wrap items-center justify-center gap-2">
+                                                <a
+                                                    href={cctvNusantaraUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all"
+                                                >
+                                                    <IconVideo size={14} />
+                                                    <span>
+                                                        {cctv.nusantara_cam
+                                                            ? 'Tonton Live di CCTV Nusantara'
+                                                            : 'Cari Kamera di CCTV Nusantara'}
+                                                    </span>
+                                                    <IconExternalLink size={13} />
+                                                </a>
+                                                <a
+                                                    href={googleStreetViewUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="px-3 py-2 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-all"
+                                                >
+                                                    <IconCompass size={14} />
+                                                    <span>Street View 360°</span>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         )}
 
@@ -555,20 +606,31 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                 </div>
 
                 {/* SITS Official Notice & Action Bar */}
-                <div className="relative px-3 sm:px-4 pb-2 flex items-center justify-between text-[11px] text-slate-400">
+                <div className="relative px-3 sm:px-4 pb-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
                     <span className="flex items-center gap-1 text-slate-400">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                         Terintegrasi SITS Dishub Kota Surabaya
                     </span>
-                    <a
-                        href="https://dishub.surabaya.go.id/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-mono transition-colors"
-                    >
-                        <span>Portal Dishub</span>
-                        <IconExternalLink size={12} />
-                    </a>
+                    <div className="flex items-center gap-3">
+                        <a
+                            href={cctvNusantaraUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-mono transition-colors"
+                        >
+                            <span>CCTV Nusantara Live</span>
+                            <IconExternalLink size={12} />
+                        </a>
+                        <a
+                            href="https://dishub.surabaya.go.id/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-mono transition-colors"
+                        >
+                            <span>Portal Dishub</span>
+                            <IconExternalLink size={12} />
+                        </a>
+                    </div>
                 </div>
 
                 {/* Footer Actions */}
