@@ -424,6 +424,77 @@ const MapView: React.FC<MapViewProps> = ({
     if (mapRef.current) mapRef.current.getCanvas().style.cursor = '';
   }, []);
 
+  // ─── Realistic Water Styling (Deep Marine Blue for Surabaya Rivers, Canals & Coast) ──
+  const applyRealisticWaterStyle = useCallback((map: mapboxgl.Map, mode: MapStyleMode) => {
+    if (!map || !map.isStyleLoaded()) return;
+    const isSat = mode === 'satelit';
+
+    const layers = map.getStyle().layers || [];
+
+    for (const layer of layers) {
+      const id = layer.id.toLowerCase();
+      const sourceLayer = (layer['source-layer'] || '').toLowerCase();
+
+      // Sembunyikan bayangan air default yang berwarna abu-abu kusam
+      if (id.includes('water-shadow') || id.includes('waterway-shadow')) {
+        try {
+          map.setLayoutProperty(layer.id, 'visibility', 'none');
+        } catch {
+          /* ignore */
+        }
+        continue;
+      }
+
+      // Layer air poligon (danau, sungai, waduk, laut, bozem, kanal)
+      if (layer.type === 'fill' && (id === 'water' || id.includes('water') || sourceLayer === 'water')) {
+        try {
+          // Warna air laut / sungai realistis:
+          // Di mode vektor: Deep Vibrant Tropical Blue (#1A659E)
+          // Di mode satelit: Semi-translucent Deep Ocean Blue (#145A86) agar menyatu dengan foto satelit dan tidak putih polos
+          map.setPaintProperty(
+            layer.id,
+            'fill-color',
+            isSat ? '#145A86' : '#1A659E'
+          );
+          map.setPaintProperty(
+            layer.id,
+            'fill-opacity',
+            isSat ? 0.75 : 0.98
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+
+      // Layer garis sungai / aliran air
+      if (layer.type === 'line' && (id === 'waterway' || id.includes('waterway') || sourceLayer === 'waterway')) {
+        try {
+          map.setPaintProperty(
+            layer.id,
+            'line-color',
+            isSat ? '#1C6D9E' : '#1D72A8'
+          );
+          map.setPaintProperty(
+            layer.id,
+            'line-opacity',
+            isSat ? 0.85 : 0.98
+          );
+          map.setPaintProperty(layer.id, 'line-width', [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, 1.5,
+            13, 3.0,
+            16, 5.5,
+            18, 9.0,
+          ]);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }, []);
+
   // ─── Ultra-HD Real Satellite Layer (Retina / 2x High-DPI Tiles) ─────────────
   const addSatelliteLayer = useCallback((map: mapboxgl.Map) => {
     if (!map.getSource('satellite-source')) {
@@ -831,6 +902,7 @@ const MapView: React.FC<MapViewProps> = ({
       add3DBuildingsLayer(map);
       addKecamatanLayers(map);
       addReportLayers(map);
+      applyRealisticWaterStyle(map, mapStyleRef.current);
       if (isInitialLoadRef.current) {
         debouncedFetchReports(map);
         isInitialLoadRef.current = false;
@@ -838,7 +910,10 @@ const MapView: React.FC<MapViewProps> = ({
     });
     map.on('moveend', () => { debouncedFetchReports(map); updateCustomMarkers(); });
     map.on('zoomend', updateCustomMarkers);
-    map.on('idle', updateCustomMarkers);
+    map.on('idle', () => {
+      updateCustomMarkers();
+      applyRealisticWaterStyle(map, mapStyleRef.current);
+    });
     map.on('sourcedata', (e) => {
       if (e.sourceId === 'reports-source' && e.isSourceLoaded) updateCustomMarkers();
     });
@@ -857,7 +932,7 @@ const MapView: React.FC<MapViewProps> = ({
       map.remove();
       mapRef.current = null;
     };
-  }, [debouncedFetchReports, addSatelliteLayer, add3DBuildingsLayer, addKecamatanLayers, addReportLayers, updateCustomMarkers]);
+  }, [debouncedFetchReports, addSatelliteLayer, add3DBuildingsLayer, addKecamatanLayers, addReportLayers, applyRealisticWaterStyle, updateCustomMarkers]);
 
   // ─── Update data saat filteredReports berubah ────────────────────────────
   useEffect(() => {
@@ -1082,7 +1157,8 @@ const MapView: React.FC<MapViewProps> = ({
     if (map.getLayer('3d-buildings')) {
       map.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', next === 'satelit' ? 0.38 : 0.92);
     }
-  }, [mapStyle]);
+    applyRealisticWaterStyle(map, next);
+  }, [mapStyle, applyRealisticWaterStyle]);
 
   const handleToggle3D = useCallback(() => {
     const next = !is3DMode;
