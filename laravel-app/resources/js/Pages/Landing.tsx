@@ -90,7 +90,7 @@ const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 font-sans flex flex-col">
+    <div className="min-h-screen w-full shrink-0 bg-white text-slate-800 font-sans">
       {/* ── Top Navigation ── */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -273,7 +273,7 @@ const LandingPage: React.FC = () => {
       </nav>
 
       {/* ── Hero Section ── */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-white pt-14 pb-12 md:pt-20 md:pb-16 px-4 border-b border-slate-100">
+      <section className="relative overflow-x-clip bg-gradient-to-b from-slate-50 via-white to-white pt-14 pb-12 md:pt-20 md:pb-16 px-4 border-b border-slate-100">
         {/* Subtle decorative background accents */}
         <div
           className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[720px] h-[360px] rounded-full opacity-25 blur-3xl"
