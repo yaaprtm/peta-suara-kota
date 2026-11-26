@@ -29,6 +29,11 @@ import WaterSensorModal, { WaterPumpItem } from './WaterSensorModal';
 import ShipModal, { ShipItem } from './ShipModal';
 import WeatherForecastModal from './WeatherForecastModal';
 import TacticalCommandBar from './TacticalCommandBar';
+import {
+  fetchSurabayaSpatialWeather,
+  buildWeatherGeoJsonForHour,
+  SpatialWeatherDataset,
+} from '../../lib/weatherMap';
 
 // ─── Mapbox Access Token Setup & Validation ───────────────────────────────────
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -282,9 +287,20 @@ const MapView: React.FC<MapViewProps> = ({
   const shipMarkersRef = useRef<mapboxgl.Marker[]>([]);
 
   const [isRainRadarMode, setIsRainRadarMode] = useState(false);
+  const isRainRadarModeRef = useRef(false);
   const [rainFrames, setRainFrames] = useState<{ time: number; path: string }[]>([]);
   const [rainFrameIndex, setRainFrameIndex] = useState(0);
   const [isRainPlaying, setIsRainPlaying] = useState(false);
+  const [weatherHudTab, setWeatherHudTab] = useState<'spatial' | 'radar'>('spatial');
+  const [spatialWeather, setSpatialWeather] = useState<SpatialWeatherDataset | null>(null);
+  const spatialWeatherRef = useRef<SpatialWeatherDataset | null>(null);
+  spatialWeatherRef.current = spatialWeather;
+  const [weatherHourOffset, setWeatherHourOffset] = useState(0);
+  const weatherHourOffsetRef = useRef(0);
+  weatherHourOffsetRef.current = weatherHourOffset;
+  const [isSpatialPlaying, setIsSpatialPlaying] = useState(false);
+  const [isWeatherLoading, setIsWeatherLoading] = useState(false);
+  const weatherPopupRef = useRef<mapboxgl.Popup | null>(null);
   const [isWeatherModalOpen, setIsWeatherModalOpen] = useState(false);
 
   const [densityData, setDensityData] = useState<KecamatanDensityItem[]>([]);
@@ -911,6 +927,9 @@ const MapView: React.FC<MapViewProps> = ({
       addKecamatanLayers(map);
       addReportLayers(map);
       applyRealisticWaterStyle(map, mapStyleRef.current);
+      if (isRainRadarModeRef.current && spatialWeatherRef.current) {
+        applySpatialWeatherLayer(spatialWeatherRef.current, weatherHourOffsetRef.current);
+      }
       if (isInitialLoadRef.current) {
         debouncedFetchReports(map);
         isInitialLoadRef.current = false;
@@ -1380,7 +1399,113 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, []);
 
-  // ─── Radar Hujan Real-Time (RainViewer) ───────────────────────────────────
+  // ─── Peta Sebaran & Radar Hujan Real-Time ─────────────────────────────────
+  const applySpatialWeatherLayer = useCallback(
+    (dataset: SpatialWeatherDataset, hourOffset: number) => {
+      const map = mapRef.current;
+      if (!map || !map.isStyleLoaded()) return;
+
+      const geojson = buildWeatherGeoJsonForHour(dataset, hourOffset);
+      const existingSource = map.getSource('weather-kecamatan-source') as mapboxgl.GeoJSONSource | undefined;
+
+      if (existingSource) {
+        existingSource.setData(geojson);
+        return;
+      }
+
+      map.addSource('weather-kecamatan-source', {
+        type: 'geojson',
+        data: geojson,
+      });
+
+      map.addLayer({
+        id: 'weather-kecamatan-fill',
+        type: 'fill',
+        source: 'weather-kecamatan-source',
+        paint: {
+          'fill-color': ['get', 'weatherColor'],
+          'fill-opacity': 0.48,
+        },
+      });
+
+      map.addLayer({
+        id: 'weather-kecamatan-border',
+        type: 'line',
+        source: 'weather-kecamatan-source',
+        paint: {
+          'line-color': '#0F172A',
+          'line-width': 1.4,
+          'line-opacity': 0.72,
+        },
+      });
+
+      map.addLayer({
+        id: 'weather-kecamatan-label',
+        type: 'symbol',
+        source: 'weather-kecamatan-source',
+        layout: {
+          'text-field': ['get', 'weatherMapLabel'],
+          'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+          'text-size': 10.5,
+          'text-line-height': 1.15,
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#FFFFFF',
+          'text-halo-color': '#0F172A',
+          'text-halo-width': 1.6,
+        },
+      });
+
+      map.on('mousemove', 'weather-kecamatan-fill', (e) => {
+        if (!e.features || e.features.length === 0) return;
+        const props = e.features[0].properties || {};
+        map.getCanvas().style.cursor = 'pointer';
+
+        if (!weatherPopupRef.current) {
+          weatherPopupRef.current = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 12,
+          });
+        }
+
+        const html = `
+          <div style="font-family: Inter, sans-serif; font-size: 11px; min-width: 170px; color: #0F172A;">
+            <div style="font-weight: 700; font-size: 12px; margin-bottom: 3px;">Kec. ${props.name || '-'}</div>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom: 5px;">
+              <span style="width:9px; height:9px; border-radius:50%; background:${props.weatherColor || '#38bdf8'}; display:inline-block;"></span>
+              <span style="font-weight:600;">${props.weatherLabel || '-'}</span>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; font-size: 10.5px; color: #334155;">
+              <div>Suhu: <b>${props.weatherTemp ?? '-'}°C</b></div>
+              <div>Hujan: <b>${props.weatherPrecipMm ?? 0} mm</b></div>
+              <div>Peluang: <b>${props.weatherPrecipProb ?? 0}%</b></div>
+              <div>Angin: <b>${props.weatherWind ?? 0} km/j</b></div>
+            </div>
+          </div>
+        `;
+        weatherPopupRef.current.setLngLat(e.lngLat).setHTML(html).addTo(map);
+      });
+
+      map.on('mouseleave', 'weather-kecamatan-fill', () => {
+        map.getCanvas().style.cursor = '';
+        weatherPopupRef.current?.remove();
+      });
+    },
+    []
+  );
+
+  const removeSpatialWeatherLayer = useCallback(() => {
+    const map = mapRef.current;
+    weatherPopupRef.current?.remove();
+    if (!map) return;
+    if (map.getLayer('weather-kecamatan-label')) map.removeLayer('weather-kecamatan-label');
+    if (map.getLayer('weather-kecamatan-border')) map.removeLayer('weather-kecamatan-border');
+    if (map.getLayer('weather-kecamatan-fill')) map.removeLayer('weather-kecamatan-fill');
+    if (map.getSource('weather-kecamatan-source')) map.removeSource('weather-kecamatan-source');
+  }, []);
+
   const applyRainRadarFrame = useCallback((frame: { time: number; path: string }) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -1413,7 +1538,7 @@ const MapView: React.FC<MapViewProps> = ({
       type: 'raster',
       source: 'rainviewer-radar-source',
       paint: {
-        'raster-opacity': 0.68,
+        'raster-opacity': 0.72,
         'raster-fade-duration': 200,
       },
     });
@@ -1433,48 +1558,91 @@ const MapView: React.FC<MapViewProps> = ({
   const handleToggleRainRadar = useCallback(async () => {
     const next = !isRainRadarMode;
     setIsRainRadarMode(next);
+    isRainRadarModeRef.current = next;
 
     if (next) {
-      let frames = rainFrames;
-      if (frames.length === 0) {
-        try {
-          const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-          const json = await res.json();
-          const past = json?.radar?.past || [];
-          const nowcast = json?.radar?.nowcast || [];
-          frames = [...past, ...nowcast];
-          setRainFrames(frames);
-        } catch {
-          frames = [];
-        }
+      // Zoom out ke cakupan 31 kecamatan Surabaya agar sebaran & prediksi hujan langsung terlihat
+      if (mapRef.current) {
+        mapRef.current.flyTo({
+          center: [112.735, -7.265],
+          zoom: 11.4,
+          pitch: 0,
+          bearing: 0,
+          duration: 750,
+        });
       }
-      if (frames.length > 0) {
-        const latestIdx = frames.length - 1;
-        setRainFrameIndex(latestIdx);
-        applyRainRadarFrame(frames[latestIdx]);
-        setIsRainPlaying(true);
+
+      setIsWeatherLoading(true);
+      try {
+        const [spatialRes, radarRes] = await Promise.allSettled([
+          spatialWeather ? Promise.resolve(spatialWeather) : fetchSurabayaSpatialWeather(),
+          rainFrames.length > 0
+            ? Promise.resolve(rainFrames)
+            : fetch('https://api.rainviewer.com/public/weather-maps.json')
+                .then((r) => r.json())
+                .then((j) => [...(j?.radar?.past || []), ...(j?.radar?.nowcast || [])]),
+        ]);
+
+        if (spatialRes.status === 'fulfilled' && spatialRes.value) {
+          setSpatialWeather(spatialRes.value);
+          setWeatherHourOffset(0);
+          setWeatherHudTab('spatial');
+          applySpatialWeatherLayer(spatialRes.value, 0);
+        }
+
+        if (radarRes.status === 'fulfilled' && Array.isArray(radarRes.value) && radarRes.value.length > 0) {
+          setRainFrames(radarRes.value);
+          const latestIdx = radarRes.value.length - 1;
+          setRainFrameIndex(latestIdx);
+          applyRainRadarFrame(radarRes.value[latestIdx]);
+        }
+      } finally {
+        setIsWeatherLoading(false);
       }
     } else {
       setIsRainPlaying(false);
+      setIsSpatialPlaying(false);
       removeRainRadarLayer();
+      removeSpatialWeatherLayer();
     }
-  }, [isRainRadarMode, rainFrames, applyRainRadarFrame, removeRainRadarLayer]);
+  }, [
+    isRainRadarMode,
+    spatialWeather,
+    rainFrames,
+    applySpatialWeatherLayer,
+    applyRainRadarFrame,
+    removeRainRadarLayer,
+    removeSpatialWeatherLayer,
+  ]);
 
   useEffect(() => {
-    if (!isRainRadarMode || rainFrames.length === 0) return;
+    if (!isRainRadarMode || !spatialWeather) return;
+    applySpatialWeatherLayer(spatialWeather, weatherHourOffset);
+  }, [isRainRadarMode, spatialWeather, weatherHourOffset, applySpatialWeatherLayer]);
+
+  useEffect(() => {
+    if (!isRainRadarMode || !isSpatialPlaying || !spatialWeather) return;
+    const timer = setInterval(() => {
+      setWeatherHourOffset((prev) => (prev + 1) % 25);
+    }, 900);
+    return () => clearInterval(timer);
+  }, [isRainRadarMode, isSpatialPlaying, spatialWeather]);
+
+  useEffect(() => {
+    if (!isRainRadarMode || weatherHudTab !== 'radar' || rainFrames.length === 0) return;
     const frame = rainFrames[rainFrameIndex];
     if (frame) {
       applyRainRadarFrame(frame);
     }
-  }, [isRainRadarMode, rainFrameIndex, rainFrames, applyRainRadarFrame]);
+  }, [isRainRadarMode, weatherHudTab, rainFrameIndex, rainFrames, applyRainRadarFrame]);
 
   useEffect(() => {
-    if (!isRainRadarMode || !isRainPlaying || rainFrames.length <= 1) return;
+    if (!isRainRadarMode || weatherHudTab !== 'radar' || !isRainPlaying || rainFrames.length <= 1) return;
     const timer = setInterval(() => {
       setRainFrameIndex((prev) => (prev + 1) % rainFrames.length);
     }, 950);
     return () => clearInterval(timer);
-  }, [isRainRadarMode, isRainPlaying, rainFrames.length]);
+  }, [isRainRadarMode, weatherHudTab, isRainPlaying, rainFrames.length]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -1743,78 +1911,191 @@ const MapView: React.FC<MapViewProps> = ({
         />
       )}
 
-      {/* ── Radar Hujan Floating Controller ── */}
-      {isRainRadarMode && rainFrames.length > 0 && (
+      {/* ── Peta Sebaran & Radar Hujan Floating Controller ── */}
+      {isRainRadarMode && (
         <div
-          className="absolute top-14 right-3 z-[12] rounded-xl p-2.5 shadow-xl select-none w-[240px] backdrop-blur-md"
+          className="absolute top-14 right-3 z-[12] rounded-xl p-3 shadow-xl select-none w-[268px] backdrop-blur-md"
           style={{
-            background: 'rgba(6, 16, 30, 0.9)',
+            background: 'rgba(6, 16, 30, 0.92)',
             border: '1px solid rgba(56, 189, 248, 0.35)',
           }}
         >
-          <div className="flex items-center justify-between gap-2 mb-1.5">
+          <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-              <span className="text-[10px] font-mono font-bold text-sky-300 uppercase">RADAR PETA HUJAN</span>
+              <span className="text-[10px] font-mono font-bold text-sky-300 uppercase">
+                PETA SEBARAN & PREDIKSI HUJAN
+              </span>
             </div>
             <button
               type="button"
               onClick={() => setIsWeatherModalOpen(true)}
-              className="text-[10px] font-mono text-amber-300 hover:underline"
+              className="text-[10px] font-mono text-amber-300 hover:underline shrink-0"
             >
-              Forecast
+              BMKG →
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Mode Tabs: Prediksi 24 Jam vs Radar Nowcast */}
+          <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-slate-900/90 border border-white/10 mb-2.5 text-[10px] font-mono">
             <button
               type="button"
-              onClick={() => setIsRainPlaying((p) => !p)}
-              className="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-400/40 text-sky-300 flex items-center justify-center hover:bg-sky-500/30 shrink-0"
-              title={isRainPlaying ? 'Jeda Animasi Radar' : 'Putar Animasi Radar'}
-            >
-              {isRainPlaying ? <IconPlayerPause size={13} /> : <IconPlayerPlay size={13} />}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={rainFrames.length - 1}
-              value={rainFrameIndex}
-              onChange={(e) => {
+              onClick={() => {
                 setIsRainPlaying(false);
-                setRainFrameIndex(Number(e.target.value));
+                setWeatherHudTab('spatial');
               }}
-              className="w-full accent-sky-400 cursor-pointer"
-            />
+              className={`py-1 rounded-md transition-colors ${
+                weatherHudTab === 'spatial'
+                  ? 'bg-sky-500 text-white font-bold'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              Prediksi 24 Jam
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsSpatialPlaying(false);
+                setWeatherHudTab('radar');
+              }}
+              className={`py-1 rounded-md transition-colors ${
+                weatherHudTab === 'radar'
+                  ? 'bg-sky-500 text-white font-bold'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              Radar Nowcast
+            </button>
           </div>
 
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-300 mt-1.5">
-            <span>
-              {new Date(rainFrames[rainFrameIndex].time * 1000).toLocaleTimeString('id-ID', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-              })}{' '}
-              WIB
-            </span>
-            <span className="text-slate-400">
-              Frame {rainFrameIndex + 1}/{rainFrames.length}
-            </span>
-          </div>
-
-          <div className="mt-2 pt-1.5 border-t border-white/10">
-            <div
-              className="h-2 rounded-sm w-full"
-              style={{
-                background: 'linear-gradient(to right, #38bdf8, #22c55e, #eab308, #f97316, #ef4444)',
-              }}
-            />
-            <div className="flex justify-between text-[9px] font-mono text-slate-400 mt-0.5">
-              <span>Ringan</span>
-              <span>Sedang</span>
-              <span>Lebat</span>
+          {isWeatherLoading ? (
+            <div className="py-3 text-center text-[11px] text-sky-300 font-mono">
+              Memuat data cuaca 31 kecamatan...
             </div>
-          </div>
+          ) : weatherHudTab === 'spatial' ? (
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSpatialPlaying((p) => !p)}
+                  className="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-400/40 text-sky-300 flex items-center justify-center hover:bg-sky-500/30 shrink-0"
+                  title={isSpatialPlaying ? 'Jeda Simulasi 24 Jam' : 'Putar Simulasi 24 Jam'}
+                >
+                  {isSpatialPlaying ? <IconPlayerPause size={13} /> : <IconPlayerPlay size={13} />}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={24}
+                  value={weatherHourOffset}
+                  onChange={(e) => {
+                    setIsSpatialPlaying(false);
+                    setWeatherHourOffset(Number(e.target.value));
+                  }}
+                  className="w-full accent-sky-400 cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] font-mono text-slate-200 mt-1.5">
+                <span>
+                  {spatialWeather?.times?.[spatialWeather.startIndex + weatherHourOffset]
+                    ? `${spatialWeather.times[spatialWeather.startIndex + weatherHourOffset].slice(11, 16)} WIB`
+                    : 'Sekarang'}
+                </span>
+                <span className="text-sky-300 font-bold">
+                  {weatherHourOffset === 0 ? 'Saat Ini' : `+${weatherHourOffset} Jam`}
+                </span>
+              </div>
+
+              <div className="mt-2 pt-1.5 border-t border-white/10">
+                <div className="grid grid-cols-6 gap-1 text-[8.5px] font-mono text-center text-slate-300">
+                  <div>
+                    <div className="h-2 rounded-xs bg-[#22C55E] mb-0.5" />
+                    Cerah
+                  </div>
+                  <div>
+                    <div className="h-2 rounded-xs bg-[#64748B] mb-0.5" />
+                    Awan
+                  </div>
+                  <div>
+                    <div className="h-2 rounded-xs bg-[#38BDF8] mb-0.5" />
+                    Potensi
+                  </div>
+                  <div>
+                    <div className="h-2 rounded-xs bg-[#0EA5E9] mb-0.5" />
+                    Ringan
+                  </div>
+                  <div>
+                    <div className="h-2 rounded-xs bg-[#EAB308] mb-0.5" />
+                    Sedang
+                  </div>
+                  <div>
+                    <div className="h-2 rounded-xs bg-[#EF4444] mb-0.5" />
+                    Lebat
+                  </div>
+                </div>
+                <p className="text-[9px] text-slate-400 mt-1.5 leading-tight">
+                  Arahkan kursor ke kecamatan untuk detail suhu, curah hujan & angin.
+                </p>
+              </div>
+            </>
+          ) : rainFrames.length > 0 ? (
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRainPlaying((p) => !p)}
+                  className="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-400/40 text-sky-300 flex items-center justify-center hover:bg-sky-500/30 shrink-0"
+                  title={isRainPlaying ? 'Jeda Animasi Radar' : 'Putar Animasi Radar'}
+                >
+                  {isRainPlaying ? <IconPlayerPause size={13} /> : <IconPlayerPlay size={13} />}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={rainFrames.length - 1}
+                  value={rainFrameIndex}
+                  onChange={(e) => {
+                    setIsRainPlaying(false);
+                    setRainFrameIndex(Number(e.target.value));
+                  }}
+                  className="w-full accent-sky-400 cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] font-mono text-slate-300 mt-1.5">
+                <span>
+                  {new Date(rainFrames[rainFrameIndex].time * 1000).toLocaleTimeString('id-ID', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  })}{' '}
+                  WIB
+                </span>
+                <span className="text-slate-400">
+                  Frame {rainFrameIndex + 1}/{rainFrames.length}
+                </span>
+              </div>
+
+              <div className="mt-2 pt-1.5 border-t border-white/10">
+                <div
+                  className="h-2 rounded-sm w-full"
+                  style={{
+                    background: 'linear-gradient(to right, #38bdf8, #22c55e, #eab308, #f97316, #ef4444)',
+                  }}
+                />
+                <div className="flex justify-between text-[9px] font-mono text-slate-400 mt-0.5">
+                  <span>Ringan</span>
+                  <span>Sedang</span>
+                  <span>Lebat</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="py-2 text-[10px] font-mono text-slate-400">
+              Data radar RainViewer tidak tersedia saat ini.
+            </div>
+          )}
         </div>
       )}
 
