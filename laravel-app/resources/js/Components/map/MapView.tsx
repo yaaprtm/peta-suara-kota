@@ -1386,6 +1386,13 @@ const MapView: React.FC<MapViewProps> = ({
     if (!map || !map.isStyleLoaded()) return;
 
     const tileUrl = `https://tilecache.rainviewer.com${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+    const existingSource = map.getSource('rainviewer-radar-source') as mapboxgl.RasterTileSource | undefined;
+
+    if (existingSource && typeof existingSource.setTiles === 'function') {
+      existingSource.setTiles([tileUrl]);
+      return;
+    }
+
     if (map.getLayer('rainviewer-radar-layer')) {
       map.removeLayer('rainviewer-radar-layer');
     }
@@ -1397,7 +1404,8 @@ const MapView: React.FC<MapViewProps> = ({
       type: 'raster',
       tiles: [tileUrl],
       tileSize: 256,
-      maxzoom: 12,
+      minzoom: 0,
+      maxzoom: 7,
     });
 
     map.addLayer({
