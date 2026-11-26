@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import {
     IconX,
     IconRadio,
@@ -10,7 +12,7 @@ import {
     IconVideo,
     IconLayersLinked,
     IconExternalLink,
-    IconCompass,
+    IconTrafficLights,
 } from '@tabler/icons-react';
 
 export interface CctvItem {
@@ -61,6 +63,8 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
     const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
     const [cacheBuster, setCacheBuster] = useState<number>(Date.now());
     const [feedLoaded, setFeedLoaded] = useState<boolean>(false);
+    const trafficMapContainerRef = useRef<HTMLDivElement | null>(null);
+    const trafficMapRef = useRef<mapboxgl.Map | null>(null);
 
     // Live ticking timecode clock (WIB) update setiap 1 detik
     useEffect(() => {
@@ -90,6 +94,75 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
 
     const bearing = useMemo(() => getBearingFromDirection(cctv.direction), [cctv.direction]);
 
+    // Mount interactive Mapbox Traffic Real-Time map when tab 'streetview' (Traffic Live) is active
+    useEffect(() => {
+        if (viewMode !== 'streetview' || !trafficMapContainerRef.current) return;
+
+        const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
+        if (mapboxToken) {
+            mapboxgl.accessToken = mapboxToken;
+        }
+
+        const map = new mapboxgl.Map({
+            container: trafficMapContainerRef.current,
+            style: 'mapbox://styles/mapbox/navigation-night-v1',
+            center: [cctv.lng, cctv.lat],
+            zoom: 16.2,
+            pitch: 45,
+            bearing,
+            attributionControl: false,
+        });
+
+        map.on('load', () => {
+            if (!map.getSource('mapbox-traffic-modal')) {
+                map.addSource('mapbox-traffic-modal', {
+                    type: 'vector',
+                    url: 'mapbox://mapbox.mapbox-traffic-v1',
+                });
+            }
+            if (!map.getLayer('mapbox-traffic-modal-layer')) {
+                map.addLayer({
+                    id: 'mapbox-traffic-modal-layer',
+                    type: 'line',
+                    source: 'mapbox-traffic-modal',
+                    'source-layer': 'traffic',
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: {
+                        'line-width': ['interpolate', ['linear'], ['zoom'], 12, 3, 16, 6, 18, 8],
+                        'line-opacity': 0.92,
+                        'line-color': [
+                            'match',
+                            ['get', 'congestion'],
+                            'low', '#22C55E',
+                            'moderate', '#F59E0B',
+                            'heavy', '#EF4444',
+                            'severe', '#991B1B',
+                            '#38BDF8',
+                        ],
+                    },
+                });
+            }
+
+            const pinEl = document.createElement('div');
+            pinEl.style.width = '14px';
+            pinEl.style.height = '14px';
+            pinEl.style.borderRadius = '50%';
+            pinEl.style.background = '#00ff88';
+            pinEl.style.border = '2px solid #ffffff';
+            pinEl.style.boxShadow = '0 0 12px #00ff88';
+            new mapboxgl.Marker({ element: pinEl }).setLngLat([cctv.lng, cctv.lat]).addTo(map);
+
+            setFeedLoaded(true);
+        });
+
+        trafficMapRef.current = map;
+
+        return () => {
+            map.remove();
+            trafficMapRef.current = null;
+        };
+    }, [viewMode, cctv.lng, cctv.lat, bearing, cacheBuster]);
+
     // URL Citra Satelit 3D Nyata dari Titik Koordinat Persis Surabaya
     const realSurabayaPtzUrl = useMemo(() => {
         const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -106,11 +179,6 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
         if (!directEmbedUrl) return false;
         return /\.(mp4|webm|ogg)(\?.*)?$/i.test(directEmbedUrl);
     }, [directEmbedUrl]);
-
-    // Google Maps interactive satellite iframe URL
-    const googleMapEmbedUrl = useMemo(() => {
-        return `https://maps.google.com/maps?q=${cctv.lat},${cctv.lng}&hl=id&z=18&t=k&output=embed`;
-    }, [cctv]);
 
     // Link langsung ke Google Street View 360 Panorama di lapangan
     const googleStreetViewUrl = useMemo(() => {
@@ -335,10 +403,10 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                                     ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-500/50 shadow-[0_0_8px_rgba(0,210,255,0.25)]'
                                     : 'text-slate-400 hover:text-slate-200'
                             }`}
-                            title="Tinjau Peta Lapangan / Street View"
+                            title="Peta Kepadatan Lalu Lintas Real-Time (Mapbox Traffic)"
                         >
-                            <IconCompass size={13} />
-                            <span>Peta Lapangan</span>
+                            <IconTrafficLights size={13} />
+                            <span>Traffic Live</span>
                         </button>
                     </div>
 
@@ -473,17 +541,16 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                             </div>
                         )}
 
-                        {/* MODE 3: GOOGLE MAPS / STREET VIEW LAPANGAN */}
+                        {/* MODE 3: MAPBOX LIVE TRAFFIC REAL-TIME */}
                         {viewMode === 'streetview' && (
-                            <div className="w-full h-full relative overflow-hidden bg-slate-900">
-                                <iframe
-                                    src={googleMapEmbedUrl}
-                                    title={`Peta Lokasi - ${cctv.name}`}
-                                    className="w-full h-full"
-                                    style={{ border: 'none' }}
-                                    allowFullScreen
-                                    onLoad={() => setFeedLoaded(true)}
-                                />
+                            <div className="w-full h-full relative overflow-hidden bg-slate-950">
+                                <div ref={trafficMapContainerRef} className="w-full h-full" />
+                                <div className="absolute bottom-8 left-2 z-10 flex items-center gap-2 px-2 py-1 rounded bg-black/80 border border-slate-700/80 text-[9px] font-mono text-slate-200 pointer-events-none">
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#22C55E]" />Lancar</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#F59E0B]" />Padat</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#EF4444]" />Macet</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#991B1B]" />Parah</span>
+                                </div>
                             </div>
                         )}
 
@@ -519,7 +586,7 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                                     ? 'Surabaya 3D PTZ (Mapbox)'
                                     : viewMode === 'video'
                                     ? 'Live Traffic Stream'
-                                    : 'Google Mapfield'}
+                                    : 'Mapbox Live Traffic'}
                             </div>
                         </div>
 

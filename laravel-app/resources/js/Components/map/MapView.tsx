@@ -18,6 +18,7 @@ import {
   IconRadar,
   IconPlayerPlay,
   IconPlayerPause,
+  IconTrafficLights,
 } from '@tabler/icons-react';
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
@@ -270,6 +271,8 @@ const MapView: React.FC<MapViewProps> = ({
 
   const [isCctvMode, setIsCctvMode] = useState(false);
   const isCctvModeRef = useRef(false);
+  const [isTrafficMode, setIsTrafficMode] = useState(false);
+  const isTrafficModeRef = useRef(false);
   const [cctvData, setCctvData] = useState<CctvItem[]>([]);
   const [selectedCctv, setSelectedCctv] = useState<CctvItem | null>(null);
   const cctvMarkersRef = useRef<mapboxgl.Marker[]>([]);
@@ -930,6 +933,9 @@ const MapView: React.FC<MapViewProps> = ({
       if (isRainRadarModeRef.current && spatialWeatherRef.current) {
         applySpatialWeatherLayer(spatialWeatherRef.current, weatherHourOffsetRef.current);
       }
+      if (isTrafficModeRef.current) {
+        applyTrafficLayer();
+      }
       if (isInitialLoadRef.current) {
         debouncedFetchReports(map);
         isInitialLoadRef.current = false;
@@ -1216,6 +1222,66 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, [is3DMode, setAtmosphereFog]);
 
+  const applyTrafficLayer = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (!map.getSource('mapbox-traffic-source')) {
+      map.addSource('mapbox-traffic-source', {
+        type: 'vector',
+        url: 'mapbox://mapbox.mapbox-traffic-v1',
+      });
+    }
+
+    if (!map.getLayer('mapbox-traffic-layer')) {
+      map.addLayer({
+        id: 'mapbox-traffic-layer',
+        type: 'line',
+        source: 'mapbox-traffic-source',
+        'source-layer': 'traffic',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 4, 17, 6.5],
+          'line-opacity': 0.88,
+          'line-color': [
+            'match',
+            ['get', 'congestion'],
+            'low', '#22C55E',
+            'moderate', '#F59E0B',
+            'heavy', '#EF4444',
+            'severe', '#991B1B',
+            '#38BDF8',
+          ],
+        },
+      });
+    }
+  }, []);
+
+  const removeTrafficLayer = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (map.getLayer('mapbox-traffic-layer')) {
+      map.removeLayer('mapbox-traffic-layer');
+    }
+    if (map.getSource('mapbox-traffic-source')) {
+      map.removeSource('mapbox-traffic-source');
+    }
+  }, []);
+
+  const handleToggleTraffic = useCallback(() => {
+    const next = !isTrafficMode;
+    setIsTrafficMode(next);
+    isTrafficModeRef.current = next;
+    if (next) {
+      applyTrafficLayer();
+    } else {
+      removeTrafficLayer();
+    }
+  }, [isTrafficMode, applyTrafficLayer, removeTrafficLayer]);
+
   const removeCctvMarkers = useCallback(() => {
     cctvMarkersRef.current.forEach((m) => m.remove());
     cctvMarkersRef.current = [];
@@ -1250,6 +1316,11 @@ const MapView: React.FC<MapViewProps> = ({
     isCctvModeRef.current = next;
 
     if (next) {
+      if (!isTrafficModeRef.current) {
+        setIsTrafficMode(true);
+        isTrafficModeRef.current = true;
+        applyTrafficLayer();
+      }
       let items = cctvData;
       if (items.length === 0) {
         try {
@@ -1264,7 +1335,7 @@ const MapView: React.FC<MapViewProps> = ({
     } else {
       removeCctvMarkers();
     }
-  }, [isCctvMode, cctvData, addCctvMarkers, removeCctvMarkers]);
+  }, [isCctvMode, cctvData, addCctvMarkers, removeCctvMarkers, applyTrafficLayer]);
 
   const handleViewReportsNearCctv = useCallback((cctv: CctvItem) => {
     setSelectedCctv(null);
@@ -1736,6 +1807,21 @@ const MapView: React.FC<MapViewProps> = ({
         >
           <IconDeviceCctv className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
           <span>CCTV{isCctvMode ? ' Aktif' : ''}</span>
+        </button>
+
+        {/* Mapbox Traffic Real-Time toggle */}
+        <button
+          type="button"
+          onClick={handleToggleTraffic}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-sans font-medium active:translate-y-[1px] transition-all select-none shadow-xs ${
+            isTrafficMode
+              ? 'bg-[#14532d] text-[#4ade80] border-[#4ade80] font-bold shadow-[0_0_8px_rgba(74,222,128,0.35)]'
+              : 'bg-paper-white text-ink border-ink hover:bg-paper-kraft'
+          }`}
+          title="Traffic Live (Mapbox) — Kepadatan arus lalu lintas real-time Surabaya (Hijau: Lancar, Kuning: Padat, Merah: Macet)"
+        >
+          <IconTrafficLights className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+          <span>Traffic{isTrafficMode ? ' Live' : ''}</span>
         </button>
 
         {/* Sensor Pompa Air toggle */}
