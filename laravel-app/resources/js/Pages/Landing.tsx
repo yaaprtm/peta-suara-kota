@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
-  IconBuildingCommunity,
   IconMapPin,
   IconShield,
   IconArrowRight,
@@ -16,6 +15,12 @@ import {
   IconLayoutDashboard,
   IconShieldLock,
   IconDatabase,
+  IconMicrophone,
+  IconVideo,
+  IconDroplet,
+  IconCircleCheck,
+  IconAlertTriangle,
+  IconMap2,
 } from '@tabler/icons-react';
 import { useAuthStore } from '@/stores/authStore';
 import { statsApi, reportsApi } from '@/lib/api';
@@ -268,30 +273,36 @@ const LandingPage: React.FC = () => {
       </nav>
 
       {/* ── Hero Section ── */}
-      <section className="bg-gradient-to-b from-slate-50 via-white to-white py-12 md:py-16 px-4 border-b border-slate-100">
-        <div className="max-w-5xl mx-auto text-center space-y-5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-navy-50 border border-navy-100 text-navy text-xs font-semibold">
+      <section className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-white pt-14 pb-12 md:pt-20 md:pb-16 px-4 border-b border-slate-100">
+        {/* Subtle decorative background accents */}
+        <div
+          className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[720px] h-[360px] rounded-full opacity-25 blur-3xl"
+          style={{ background: 'radial-gradient(circle, rgba(245,165,36,0.22) 0%, rgba(30,58,95,0.08) 55%, transparent 75%)' }}
+        />
+
+        <div className="relative max-w-5xl mx-auto text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-navy-50/90 border border-navy-100 text-navy text-xs font-semibold shadow-2xs">
             <span className="w-2 h-2 rounded-full bg-orange animate-pulse" />
             <span>{t('landing.heroBadge')}</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-navy tracking-tight leading-tight">
-            {t('landing.heroTitle1')} <br />
+          <h1 className="text-3xl sm:text-5xl lg:text-[3.4rem] font-extrabold text-navy tracking-tight leading-[1.15]">
+            {t('landing.heroTitle1')} <br className="hidden sm:inline" />
             <span className="text-orange">{t('landing.heroTitle2')}</span>
           </h1>
 
-          <p className="text-base text-navy max-w-2xl mx-auto leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
             {t('landing.heroDesc')}
           </p>
 
           {/* Dua Aksi Publik Utama */}
-          <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/peta"
-              className="bg-navy hover:bg-navy-600 text-white font-semibold px-6 py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md flex items-center gap-2 group cursor-pointer"
+              className="bg-navy hover:bg-navy-600 text-white font-semibold px-6 py-3.5 rounded-xl text-xs sm:text-sm transition-all shadow-md hover:shadow-lg flex items-center gap-2 group cursor-pointer"
             >
               <IconMapPin className="w-4 h-4 text-orange" />
-              <span>{t('landing.btnViewMap') || 'Lihat Peta Laporan'}</span>
+              <span>{t('landing.btnViewMap') || 'Jelajahi Peta Kota'}</span>
               <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
 
@@ -303,7 +314,7 @@ const LandingPage: React.FC = () => {
                   navigate('/lapor');
                 }
               }}
-              className="bg-orange hover:bg-orange-600 text-navy-900 font-bold px-6 py-3 rounded-xl text-xs sm:text-sm transition-all shadow-md flex items-center gap-2 group cursor-pointer"
+              className="bg-orange hover:bg-orange-600 text-navy-900 font-bold px-6 py-3.5 rounded-xl text-xs sm:text-sm transition-all shadow-md hover:shadow-lg flex items-center gap-2 group cursor-pointer"
             >
               <IconPlus className="w-4 h-4" />
               <span>{t('landing.btnCreateReport') || 'Buat Laporan'}</span>
@@ -311,42 +322,54 @@ const LandingPage: React.FC = () => {
           </div>
 
           {/* KPI Counters */}
-          <div className="pt-8 max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3 text-left">
+          <div className="pt-8 max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3.5 text-left">
             {statsLoading ? (
               <>
                 <KpiSkeleton />
                 <KpiSkeleton />
                 <KpiSkeleton />
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
+                <div className="p-4 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
                   <span className="text-[11px] font-semibold text-orange block">{t('landing.kpiCoverage')}</span>
-                  <span className="text-xl sm:text-2xl font-bold text-navy">{t('landing.kpiCoverageSub1')}</span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
+                  <span className="text-xl sm:text-2xl font-extrabold text-navy mt-0.5 block">{t('landing.kpiCoverageSub1')}</span>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
                 </div>
               </>
             ) : (
               <>
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-                  <span className="text-[11px] font-semibold text-slate-500 block">{t('landing.kpiTotal')}</span>
-                  <span className="text-xl sm:text-2xl font-bold text-navy">{totalReports}+</span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiTotalSub')}</span>
+                <div className="p-4 rounded-2xl border border-slate-200/80 bg-white shadow-xs hover:shadow-sm transition-shadow">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-slate-500">{t('landing.kpiTotal')}</span>
+                    <IconMap2 className="w-4 h-4 text-navy/60" />
+                  </div>
+                  <span className="text-xl sm:text-2xl font-extrabold text-navy">{totalReports}+</span>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">{t('landing.kpiTotalSub')}</span>
                 </div>
 
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-                  <span className="text-[11px] font-semibold text-emerald-600 block">{t('landing.kpiDone')}</span>
-                  <span className="text-xl sm:text-2xl font-bold text-emerald-700">{resolutionPct}%</span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">{completedReports} {t('landing.kpiDoneUnit')}</span>
+                <div className="p-4 rounded-2xl border border-emerald-100 bg-emerald-50/30 shadow-xs hover:shadow-sm transition-shadow">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-emerald-700">{t('landing.kpiDone')}</span>
+                    <IconCircleCheck className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <span className="text-xl sm:text-2xl font-extrabold text-emerald-700">{resolutionPct}%</span>
+                  <span className="text-[11px] text-emerald-700/70 mt-0.5 block">{completedReports} {t('landing.kpiDoneUnit')}</span>
                 </div>
 
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-                  <span className="text-[11px] font-semibold text-red-600 block">{t('landing.kpiCritical')}</span>
-                  <span className="text-xl sm:text-2xl font-bold text-red-700">{criticalReports} {t('landing.kpiCasesUnit')}</span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCriticalSub')}</span>
+                <div className="p-4 rounded-2xl border border-red-100 bg-red-50/30 shadow-xs hover:shadow-sm transition-shadow">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-red-600">{t('landing.kpiCritical')}</span>
+                    <IconAlertTriangle className="w-4 h-4 text-red-500" />
+                  </div>
+                  <span className="text-xl sm:text-2xl font-extrabold text-red-700">{criticalReports} {t('landing.kpiCasesUnit')}</span>
+                  <span className="text-[11px] text-red-600/75 mt-0.5 block">{t('landing.kpiCriticalSub')}</span>
                 </div>
 
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs">
-                  <span className="text-[11px] font-semibold text-orange block">{t('landing.kpiCoverage')}</span>
-                  <span className="text-xl sm:text-2xl font-bold text-navy">{t('landing.kpiCoverageSub1')}</span>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
+                <div className="p-4 rounded-2xl border border-amber-100 bg-amber-50/30 shadow-xs hover:shadow-sm transition-shadow">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-orange">{t('landing.kpiCoverage')}</span>
+                    <IconMapPin className="w-4 h-4 text-orange" />
+                  </div>
+                  <span className="text-xl sm:text-2xl font-extrabold text-navy">{t('landing.kpiCoverageSub1')}</span>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">{t('landing.kpiCoverageSub2')}</span>
                 </div>
               </>
             )}
@@ -355,14 +378,17 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* ── Tracking Code Search ── */}
-      <section className="py-8 bg-white px-4 border-b border-slate-100">
-        <div className="max-w-xl mx-auto">
-          <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5 sm:p-6">
+      <section className="py-10 bg-white px-4 border-b border-slate-100">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs">
             <div className="text-center mb-4">
-              <h3 className="text-sm font-bold text-navy">
+              <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-orange mb-1">
+                PELACAKAN TIKET REAL-TIME
+              </span>
+              <h3 className="text-base font-bold text-navy">
                 {t('landing.trackTitle') || 'Cek Status Laporan Anda'}
               </h3>
-              <p className="text-[11px] text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {t('landing.trackDesc') || 'Masukkan kode tiket laporan Anda (contoh: PSK-SBY-XXXXXX)'}
               </p>
             </div>
@@ -388,19 +414,19 @@ const LandingPage: React.FC = () => {
               }}
             >
               <div className="flex-1 relative">
-                <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <IconSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   value={trackingInput}
                   onChange={(e) => setTrackingInput(e.target.value.toUpperCase())}
                   placeholder="PSK-SBY-XXXXXX"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-mono text-navy focus:outline-none focus:ring-2 focus:ring-orange/40 focus:border-orange placeholder:text-slate-400"
+                  className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-mono text-navy focus:outline-none focus:ring-2 focus:ring-orange/40 focus:border-orange placeholder:text-slate-400"
                 />
               </div>
               <button
                 type="submit"
                 disabled={isSearching || !trackingInput.trim()}
-                className="btn-navy px-4 py-2.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="btn-navy px-5 py-2.5 text-xs font-semibold rounded-xl flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shadow-xs"
               >
                 {isSearching ? <IconLoader2 className="w-4 h-4 animate-spin" /> : <IconSearch className="w-4 h-4" />}
                 <span className="hidden sm:inline">{t('landing.trackBtn') || 'Lacak'}</span>
@@ -410,24 +436,82 @@ const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* ── Workflow Section ── */}
-      <section id="alur" className="py-12 bg-white px-4 border-b border-slate-100">
+      {/* ── Key Features Section ── */}
+      <section id="fitur" className="py-14 bg-slate-50/70 px-4 border-b border-slate-100">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10">
-            <span className="text-orange text-xs font-bold uppercase tracking-wider">{t('landing.sectionProcessLabel')}</span>
-            <h2 className="text-2xl font-bold text-navy mt-1">{t('landing.sectionProcessTitle')}</h2>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">{t('landing.sectionProcessDesc')}</p>
+            <span className="text-orange text-xs font-bold uppercase tracking-widest">FITUR UNGGULAN</span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-navy mt-1">Satu Peta untuk Mengawal Kota Surabaya</h2>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-xl mx-auto mt-2">
+              Menggabungkan partisipasi aktif warga dengan pemantauan kondisi lapangan kota secara terpadu.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { step: '1', bg: 'bg-navy', text: 'text-white', title: t('landing.step1Title'), desc: t('landing.step1Desc') },
-              { step: '2', bg: 'bg-orange', text: 'text-navy-900', title: t('landing.step2Title'), desc: t('landing.step2Desc') },
-              { step: '3', bg: 'bg-navy', text: 'text-white', title: t('landing.step3Title'), desc: t('landing.step3Desc') },
-              { step: '4', bg: 'bg-emerald-600', text: 'text-white', title: t('landing.step4Title'), desc: t('landing.step4Desc') },
+              {
+                icon: <IconMicrophone className="w-5 h-5 text-orange" />,
+                badge: 'AI Voice & Photo',
+                title: 'Lapor Cepat Via Suara',
+                desc: 'Rekam keluhan secara langsung tanpa perlu mengetik panjang, lengkapi foto bukti dan koordinat GPS akurat.',
+              },
+              {
+                icon: <IconVideo className="w-5 h-5 text-emerald-600" />,
+                badge: 'Surabaya 3D Map',
+                title: 'Titik CCTV & Peta 3D',
+                desc: 'Tinjau 40 titik pantauan persimpangan Surabaya dengan citra satelit 3D dan integrasi laporan warga terdekat.',
+              },
+              {
+                icon: <IconDroplet className="w-5 h-5 text-sky-600" />,
+                badge: 'Early Warning',
+                title: 'Sensor Air & Rumah Pompa',
+                desc: 'Pantau status ketinggian air dan kesiapan rumah pompa di wilayah rawan genangan Kota Surabaya.',
+              },
+              {
+                icon: <IconTrophy className="w-5 h-5 text-amber-500" />,
+                badge: 'Transparansi Publik',
+                title: 'Leaderboard & Garis Waktu',
+                desc: 'Lacak progres penanganan setiap tiket secara terbuka dan apresiasi kelurahan dengan warga paling peduli.',
+              },
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="p-5 rounded-2xl border border-slate-200/90 bg-white shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+                    {item.icon}
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                    {item.badge}
+                  </span>
+                </div>
+                <h3 className="font-bold text-navy text-sm">{item.title}</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Workflow Section ── */}
+      <section id="alur" className="py-14 bg-white px-4 border-b border-slate-100">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10">
+            <span className="text-orange text-xs font-bold uppercase tracking-widest">{t('landing.sectionProcessLabel')}</span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-navy mt-1">{t('landing.sectionProcessTitle')}</h2>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1.5">{t('landing.sectionProcessDesc')}</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { step: '01', bg: 'bg-navy', text: 'text-white', title: t('landing.step1Title'), desc: t('landing.step1Desc') },
+              { step: '02', bg: 'bg-orange', text: 'text-navy-900', title: t('landing.step2Title'), desc: t('landing.step2Desc') },
+              { step: '03', bg: 'bg-navy', text: 'text-white', title: t('landing.step3Title'), desc: t('landing.step3Desc') },
+              { step: '04', bg: 'bg-emerald-600', text: 'text-white', title: t('landing.step4Title'), desc: t('landing.step4Desc') },
             ].map(({ step, bg, text, title, desc }) => (
-              <div key={step} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-                <div className={`w-8 h-8 rounded-lg ${bg} ${text} flex items-center justify-center font-bold text-xs`}>
+              <div key={step} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:shadow-sm transition-all space-y-2.5">
+                <div className={`w-9 h-9 rounded-xl ${bg} ${text} flex items-center justify-center font-extrabold text-xs tracking-wider shadow-2xs`}>
                   {step}
                 </div>
                 <h3 className="font-bold text-navy text-sm">{title}</h3>
@@ -439,45 +523,71 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* ── Public Map Section ── */}
-      <section id="peta" className="py-12 bg-slate-50 px-4 border-b border-slate-200">
-        <div className="max-w-6xl mx-auto space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+      <section id="peta" className="py-14 bg-slate-50 px-4 border-b border-slate-200">
+        <div className="max-w-6xl mx-auto space-y-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <span className="text-orange text-xs font-bold uppercase tracking-wider">{t('landing.mapSectionLabel')}</span>
-              <h2 className="text-2xl font-bold text-navy mt-1">{t('landing.mapSectionTitle')}</h2>
-              <p className="text-xs text-slate-500">{t('landing.mapSectionDesc')}</p>
+              <span className="text-orange text-xs font-bold uppercase tracking-widest">{t('landing.mapSectionLabel')}</span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-navy mt-1">{t('landing.mapSectionTitle')}</h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">{t('landing.mapSectionDesc')}</p>
             </div>
             <Link
               href="/peta"
-              className="btn-orange text-xs font-semibold py-2 px-4 shadow-sm inline-flex items-center gap-1.5"
+              className="btn-orange text-xs font-bold py-2.5 px-5 rounded-xl shadow-sm inline-flex items-center gap-2 hover:shadow-md transition-all"
             >
               <IconMapPin className="w-4 h-4" />
               <span>{t('landing.mapBtn')}</span>
+              <IconArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          <div className="h-[460px] rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm relative">
+          <div className="h-[440px] rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-md relative">
             <iframe
               title={t('landing.mapIframeTitle')}
               width="100%"
               height="100%"
               frameBorder="0"
-              src="https://www.openstreetmap.org/export/embed.html?bbox=112.65%2C-7.35%2C112.82%2C-7.20&layer=mapnik"
+              src="https://www.openstreetmap.org/export/embed.html?bbox=112.60%2C-7.36%2C112.85%2C-7.18&layer=mapnik"
             />
+            <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm flex items-center gap-2 text-[11px] font-semibold text-navy pointer-events-none">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Wilayah Pantauan: Kota Surabaya (31 Kecamatan)</span>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── Footer ── */}
-      <footer className="bg-navy text-white py-8 px-4 mt-auto">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-300">
-          <div className="flex items-center gap-2">
-            <img src="/patrol-logo.png" alt="PATROL" className="w-5 h-5 object-contain opacity-80" />
-            <span className="font-bold text-white">PATROL Surabaya</span>
-            <span className="text-slate-500">·</span>
-            <span>{t('landing.footerWorkshop')}</span>
+      <footer className="bg-navy text-white py-10 px-4 mt-auto border-t border-navy-600">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="space-y-2 max-w-md">
+              <div className="flex items-center gap-2.5">
+                <img src="/patrol-logo.png" alt="PATROL" className="w-7 h-7 object-contain" />
+                <div>
+                  <span className="font-extrabold text-sm tracking-wide text-white block leading-none">PATROL SURABAYA</span>
+                  <span className="text-[11px] text-orange font-medium">Peta Suara Kota Surabaya</span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {t('landing.footerWorkshop')} — Menghubungkan suara warga dengan tindakan cepat dan transparan untuk Surabaya yang lebih tanggap.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-300">
+              <a href="#fitur" className="hover:text-orange transition-colors">Fitur</a>
+              <a href="#alur" className="hover:text-orange transition-colors">Alur Kerja</a>
+              <Link href="/peta" className="hover:text-orange transition-colors">Peta Interaktif</Link>
+              <Link href="/leaderboard" className="hover:text-orange transition-colors">Leaderboard</Link>
+            </div>
           </div>
-          <p className="text-slate-400 text-center sm:text-right">{t('landing.footerColors')}</p>
+
+          <div className="pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+            <p>© 2026 PATROL Surabaya. All rights reserved.</p>
+            <p className="font-medium text-slate-300">
+              Made with care by <span className="text-orange font-bold tracking-wide">@arya</span>
+            </p>
+          </div>
         </div>
       </footer>
     </div>

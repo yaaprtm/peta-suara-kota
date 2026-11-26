@@ -160,8 +160,8 @@ const en = {
     trackDesc: 'Enter your report ticket code (e.g., PSK-SBY-XXXXXX)',
     trackBtn: 'Track',
     trackNotFound: 'Ticket code not found. Please verify the code format.',
-    footerWorkshop: 'Software Engineering Workshop',
-    footerColors: 'Theme Colors: Navy (#1E3A5F) · Orange (#F5A524) · Base White (#FFFFFF)',
+    footerWorkshop: 'Surabaya City Citizen Voice & Monitoring Platform',
+    footerColors: '© 2026 PATROL Surabaya · Crafted by @arya',
   },
 
   // ── Map Page ──────────────────────────────────────────────────────────────────

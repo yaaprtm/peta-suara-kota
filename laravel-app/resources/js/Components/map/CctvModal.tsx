@@ -107,11 +107,6 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
         return /\.(mp4|webm|ogg)(\?.*)?$/i.test(directEmbedUrl);
     }, [directEmbedUrl]);
 
-    // Google Maps Live Traffic interactive iframe URL (untuk pantauan arus lalu lintas real-time di lokasi)
-    const googleTrafficEmbedUrl = useMemo(() => {
-        return `https://maps.google.com/maps?q=${cctv.lat},${cctv.lng}&hl=id&z=17&t=m&layer=t&output=embed`;
-    }, [cctv]);
-
     // Google Maps interactive satellite iframe URL
     const googleMapEmbedUrl = useMemo(() => {
         return `https://maps.google.com/maps?q=${cctv.lat},${cctv.lng}&hl=id&z=18&t=k&output=embed`;
@@ -416,7 +411,7 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                             </div>
                         )}
 
-                        {/* MODE 2: LIVE VIDEO STREAM / LIVE TRAFFIC SURABAYA */}
+                        {/* MODE 2: LIVE VIDEO STREAM (COMING SOON HINGGA API RESMI TERSEDIA) */}
                         {viewMode === 'video' && (
                             <div className="w-full h-full relative overflow-hidden bg-slate-950 flex items-center justify-center">
                                 {directEmbedUrl ? (
@@ -445,14 +440,35 @@ const CctvModal: React.FC<CctvModalProps> = ({ cctv, onClose, onViewReports }) =
                                         />
                                     )
                                 ) : (
-                                    <iframe
-                                        src={googleTrafficEmbedUrl}
-                                        title={`Live Traffic - ${cctv.name}`}
-                                        className="w-full h-full"
-                                        style={{ border: 'none' }}
-                                        allowFullScreen
-                                        onLoad={() => setFeedLoaded(true)}
-                                    />
+                                    <>
+                                        {/* Latar belakang citra satelit titik lokasi dengan efek redup */}
+                                        <img
+                                            src={realSurabayaPtzUrl}
+                                            alt={`Preview ${cctv.name}`}
+                                            className="w-full h-full object-cover opacity-25 blur-[2px]"
+                                            onLoad={() => setFeedLoaded(true)}
+                                            onError={() => setFeedLoaded(true)}
+                                        />
+                                        <div
+                                            className="absolute inset-0 pointer-events-none"
+                                            style={{
+                                                background:
+                                                    'radial-gradient(circle at center, rgba(4,9,16,0.55) 0%, rgba(4,9,16,0.92) 100%), repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,255,136,0.04) 3px, rgba(0,255,136,0.04) 6px)',
+                                            }}
+                                        />
+                                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-4 text-center">
+                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-[10px] font-mono font-bold tracking-widest uppercase mb-2.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                                <span>LIVE STREAM API</span>
+                                            </div>
+                                            <h3 className="text-2xl sm:text-3xl font-black tracking-[0.2em] text-white uppercase drop-shadow-[0_0_16px_rgba(0,255,136,0.35)]">
+                                                COMING SOON
+                                            </h3>
+                                            <p className="text-[11px] sm:text-xs text-slate-300 max-w-xs mt-2 leading-relaxed">
+                                                Siaran langsung arus lalu lintas <span className="text-emerald-300 font-semibold">{cctv.name}</span> akan segera aktif setelah integrasi API SITS Surabaya tersedia.
+                                            </p>
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         )}
