@@ -14,6 +14,10 @@ import {
   IconDeviceCctv,
   IconDroplet,
   IconShip,
+  IconCloudRain,
+  IconRadar,
+  IconPlayerPlay,
+  IconPlayerPause,
 } from '@tabler/icons-react';
 import { Report } from '../../types';
 import { useReportsStore } from '../../stores/reportsStore';
@@ -23,6 +27,7 @@ import { statsApi } from '../../lib/api';
 import CctvModal, { CctvItem } from './CctvModal';
 import WaterSensorModal, { WaterPumpItem } from './WaterSensorModal';
 import ShipModal, { ShipItem } from './ShipModal';
+import WeatherForecastModal from './WeatherForecastModal';
 import TacticalCommandBar from './TacticalCommandBar';
 
 // ─── Mapbox Access Token Setup & Validation ───────────────────────────────────
@@ -275,6 +280,12 @@ const MapView: React.FC<MapViewProps> = ({
   const [shipData, setShipData] = useState<ShipItem[]>([]);
   const [selectedShip, setSelectedShip] = useState<ShipItem | null>(null);
   const shipMarkersRef = useRef<mapboxgl.Marker[]>([]);
+
+  const [isRainRadarMode, setIsRainRadarMode] = useState(false);
+  const [rainFrames, setRainFrames] = useState<{ time: number; path: string }[]>([]);
+  const [rainFrameIndex, setRainFrameIndex] = useState(0);
+  const [isRainPlaying, setIsRainPlaying] = useState(false);
+  const [isWeatherModalOpen, setIsWeatherModalOpen] = useState(false);
 
   const [densityData, setDensityData] = useState<KecamatanDensityItem[]>([]);
   const [maxDensity, setMaxDensity] = useState(1);
@@ -1369,6 +1380,94 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, []);
 
+  // ─── Radar Hujan Real-Time (RainViewer) ───────────────────────────────────
+  const applyRainRadarFrame = useCallback((frame: { time: number; path: string }) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const tileUrl = `https://tilecache.rainviewer.com${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+    if (map.getLayer('rainviewer-radar-layer')) {
+      map.removeLayer('rainviewer-radar-layer');
+    }
+    if (map.getSource('rainviewer-radar-source')) {
+      map.removeSource('rainviewer-radar-source');
+    }
+
+    map.addSource('rainviewer-radar-source', {
+      type: 'raster',
+      tiles: [tileUrl],
+      tileSize: 256,
+      maxzoom: 12,
+    });
+
+    map.addLayer({
+      id: 'rainviewer-radar-layer',
+      type: 'raster',
+      source: 'rainviewer-radar-source',
+      paint: {
+        'raster-opacity': 0.68,
+        'raster-fade-duration': 200,
+      },
+    });
+  }, []);
+
+  const removeRainRadarLayer = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (map.getLayer('rainviewer-radar-layer')) {
+      map.removeLayer('rainviewer-radar-layer');
+    }
+    if (map.getSource('rainviewer-radar-source')) {
+      map.removeSource('rainviewer-radar-source');
+    }
+  }, []);
+
+  const handleToggleRainRadar = useCallback(async () => {
+    const next = !isRainRadarMode;
+    setIsRainRadarMode(next);
+
+    if (next) {
+      let frames = rainFrames;
+      if (frames.length === 0) {
+        try {
+          const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+          const json = await res.json();
+          const past = json?.radar?.past || [];
+          const nowcast = json?.radar?.nowcast || [];
+          frames = [...past, ...nowcast];
+          setRainFrames(frames);
+        } catch {
+          frames = [];
+        }
+      }
+      if (frames.length > 0) {
+        const latestIdx = frames.length - 1;
+        setRainFrameIndex(latestIdx);
+        applyRainRadarFrame(frames[latestIdx]);
+        setIsRainPlaying(true);
+      }
+    } else {
+      setIsRainPlaying(false);
+      removeRainRadarLayer();
+    }
+  }, [isRainRadarMode, rainFrames, applyRainRadarFrame, removeRainRadarLayer]);
+
+  useEffect(() => {
+    if (!isRainRadarMode || rainFrames.length === 0) return;
+    const frame = rainFrames[rainFrameIndex];
+    if (frame) {
+      applyRainRadarFrame(frame);
+    }
+  }, [isRainRadarMode, rainFrameIndex, rainFrames, applyRainRadarFrame]);
+
+  useEffect(() => {
+    if (!isRainRadarMode || !isRainPlaying || rainFrames.length <= 1) return;
+    const timer = setInterval(() => {
+      setRainFrameIndex((prev) => (prev + 1) % rainFrames.length);
+    }, 950);
+    return () => clearInterval(timer);
+  }, [isRainRadarMode, isRainPlaying, rainFrames.length]);
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="relative w-full h-full">
@@ -1492,6 +1591,36 @@ const MapView: React.FC<MapViewProps> = ({
           <IconShip className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
           <span>Radar Kapal{isShipMode ? ' Aktif' : ''}</span>
         </button>
+
+        {/* Peta Hujan (Radar Cuaca Real-Time) toggle */}
+        <button
+          type="button"
+          onClick={handleToggleRainRadar}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-sans font-medium active:translate-y-[1px] transition-all select-none shadow-xs ${
+            isRainRadarMode
+              ? 'bg-[#082f49] text-[#38bdf8] border-[#38bdf8] font-bold shadow-[0_0_8px_rgba(56,189,248,0.4)]'
+              : 'bg-paper-white text-ink border-ink hover:bg-paper-kraft'
+          }`}
+          title="Peta Hujan — Overlay radar curah hujan real-time di atas wilayah Surabaya"
+        >
+          <IconRadar className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+          <span>Peta Hujan{isRainRadarMode ? ' Aktif' : ''}</span>
+        </button>
+
+        {/* Forecast & Prediksi Cuaca modal trigger */}
+        <button
+          type="button"
+          onClick={() => setIsWeatherModalOpen(true)}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 border text-xs font-sans font-medium active:translate-y-[1px] transition-all select-none shadow-xs ${
+            isWeatherModalOpen
+              ? 'bg-[#1E3A5F] text-white border-[#1E3A5F] font-bold'
+              : 'bg-paper-white text-ink border-ink hover:bg-paper-kraft'
+          }`}
+          title="Forecast & Prediksi Cuaca Surabaya (BMKG & Nowcast 24 Jam)"
+        >
+          <IconCloudRain className="w-3.5 h-3.5 shrink-0" stroke={1.8} />
+          <span>Forecast Cuaca</span>
+        </button>
       </div>
 
       {/* ── Task #6: Heatmap Legend ── */}
@@ -1603,6 +1732,90 @@ const MapView: React.FC<MapViewProps> = ({
           ship={selectedShip}
           onClose={() => setSelectedShip(null)}
           onFocusShip={handleFocusShip}
+        />
+      )}
+
+      {/* ── Radar Hujan Floating Controller ── */}
+      {isRainRadarMode && rainFrames.length > 0 && (
+        <div
+          className="absolute top-14 right-3 z-[12] rounded-xl p-2.5 shadow-xl select-none w-[240px] backdrop-blur-md"
+          style={{
+            background: 'rgba(6, 16, 30, 0.9)',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+              <span className="text-[10px] font-mono font-bold text-sky-300 uppercase">RADAR PETA HUJAN</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsWeatherModalOpen(true)}
+              className="text-[10px] font-mono text-amber-300 hover:underline"
+            >
+              Forecast
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsRainPlaying((p) => !p)}
+              className="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-400/40 text-sky-300 flex items-center justify-center hover:bg-sky-500/30 shrink-0"
+              title={isRainPlaying ? 'Jeda Animasi Radar' : 'Putar Animasi Radar'}
+            >
+              {isRainPlaying ? <IconPlayerPause size={13} /> : <IconPlayerPlay size={13} />}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={rainFrames.length - 1}
+              value={rainFrameIndex}
+              onChange={(e) => {
+                setIsRainPlaying(false);
+                setRainFrameIndex(Number(e.target.value));
+              }}
+              className="w-full accent-sky-400 cursor-pointer"
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] font-mono text-slate-300 mt-1.5">
+            <span>
+              {new Date(rainFrames[rainFrameIndex].time * 1000).toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+              })}{' '}
+              WIB
+            </span>
+            <span className="text-slate-400">
+              Frame {rainFrameIndex + 1}/{rainFrames.length}
+            </span>
+          </div>
+
+          <div className="mt-2 pt-1.5 border-t border-white/10">
+            <div
+              className="h-2 rounded-sm w-full"
+              style={{
+                background: 'linear-gradient(to right, #38bdf8, #22c55e, #eab308, #f97316, #ef4444)',
+              }}
+            />
+            <div className="flex justify-between text-[9px] font-mono text-slate-400 mt-0.5">
+              <span>Ringan</span>
+              <span>Sedang</span>
+              <span>Lebat</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Forecast & Prediksi Cuaca Modal ── */}
+      {isWeatherModalOpen && (
+        <WeatherForecastModal
+          onClose={() => setIsWeatherModalOpen(false)}
+          isRainRadarActive={isRainRadarMode}
+          onToggleRainRadar={handleToggleRainRadar}
         />
       )}
     </div>
