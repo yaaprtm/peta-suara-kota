@@ -291,7 +291,7 @@ const LandingPage: React.FC = () => {
             <span className="text-orange">{t('landing.heroTitle2')}</span>
           </h1>
 
-          <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-sm sm:text-[16px] text-slate-600 max-w-2xl mx-auto leading-relaxed">
             {t('landing.heroDesc')}
           </p>
 
@@ -385,7 +385,7 @@ const LandingPage: React.FC = () => {
               <span className="inline-block text-[10px] font-bold uppercase tracking-widest text-orange mb-1">
                 PELACAKAN TIKET REAL-TIME
               </span>
-              <h3 className="text-base font-bold text-navy">
+              <h3 className="text-[16px] font-bold text-navy">
                 {t('landing.trackTitle') || 'Cek Status Laporan Anda'}
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
