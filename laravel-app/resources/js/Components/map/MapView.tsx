@@ -1704,7 +1704,7 @@ const MapView: React.FC<MapViewProps> = ({
       )}
 
       {/* ── Atribusi ── */}
-      <div className="absolute bottom-3 right-3 z-[10] hidden sm:block px-2.5 py-1 bg-paper-white/95 border border-ink text-[10px] font-mono text-ink/80 select-none shadow-sm pointer-events-none">
+      <div className="absolute bottom-14 right-3 z-[10] hidden sm:block px-2.5 py-1 bg-paper-white/95 border border-ink text-[10px] font-mono text-ink/80 select-none shadow-sm pointer-events-none">
         Batas Wilayah: Pemkot Surabaya (Satu Data / Perwali No. 26/2023)
       </div>
 
